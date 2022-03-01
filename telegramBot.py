@@ -37,6 +37,8 @@ def send_screenshot(message):
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
+    # clear the options
+    bot.edit_message_reply_markup(message_id=call.message.id, chat_id=call.message.chat.id, reply_markup=None)
     file = f"Audio_{timeStamp()}.wav"
     if call.data == "cb_stop":
         bot.send_message(call.from_user.id, "Processing please wait")
@@ -47,6 +49,7 @@ def callback_query(call):
         # os.remove(file)
 
     elif call.data == "cb_cancel":
+        # break if fail, dont send message again
         rec.stop(file,True)
         bot.send_message(call.from_user.id, "Recording terminated")
 

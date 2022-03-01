@@ -8,6 +8,8 @@ from datetime import datetime
 import cv2
 
 # pip install opencv-python pyTelegramBotAPI
+# https://stackoverflow.com/questions/14140495/how-to-capture-a-video-and-audio-in-python-from-a-camera-or-webcam
+
 
 class recordAudio:
 
