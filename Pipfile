@@ -1,0 +1,14 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+pyaudio = {path = "./PyAudio-0.2.11-cp39-cp39-win_amd64.whl"}
+pytelegrambotapi = "*"
+opencv-python = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.9"

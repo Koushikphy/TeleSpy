@@ -23,17 +23,15 @@ class recordAudio:
 
         self.p = pyaudio.PyAudio()  # Create an interface to PortAudio
 
-
-
         # Store data in chunks for 3 seconds
         # for i in range(0, int(self.fs / self.chunk * self.seconds)):
-        self.chunkInEachSec = int(self.fs/self.chunk)
+        self.chunkInEachSec = int(self.fs / self.chunk)
 
         self.stream = self.p.open(format=self.sample_format,
-                        channels=self.channels,
-                        rate=self.fs,
-                        frames_per_buffer=self.chunk,
-                        input=True)
+                                  channels=self.channels,
+                                  rate=self.fs,
+                                  frames_per_buffer=self.chunk,
+                                  input=True)
 
     def startAudio(self):
 
@@ -41,9 +39,9 @@ class recordAudio:
         self.running = True
         self.stream.start_stream()
         # try:
-        count=0
+        count = 0
         while self.running:
-            count+=1
+            count += 1
             # if self.stream.is_stopped():
             #     print('stopped')
             #     break
@@ -54,15 +52,15 @@ class recordAudio:
         # except Exception as e:
         #     print("exception occured", e)
 
-    def stopRecording(self,filename, dontSave=False):
+    def stopRecording(self, filename, dontSave=False):
 
         self.running = False
-        # Stop and close the self.stream 
+        # Stop and close the self.stream
         self.stream.stop_stream()
         self.stream.close()
         # Terminate the PortAudio interface
         self.p.terminate()
-        if dontSave : 
+        if dontSave:
             return
         # print('Finished recording')
         # Save the recorded data as a WAV file
@@ -73,56 +71,49 @@ class recordAudio:
         wf.writeframes(b''.join(self.frames))
         wf.close()
 
- 
-
-
     def start(self):
-        self.t = Thread(target = self.startAudio)
-        self.t.start() 
+        self.t = Thread(target=self.startAudio)
+        self.t.start()
 
-
-
-    def stop(self,file, dontSave=False):
-        self.stopRecording(file,dontSave)
+    def stop(self, file, dontSave=False):
+        self.stopRecording(file, dontSave)
         self.t.join()
-
-
 
 
 class VideoRecorder():
 
-
-
-    # Video class based on openCV 
+    # Video class based on openCV
     def __init__(self):
-        self.open = True
+        self.running = False
         self.device_index = 0
-        self.fps = 15               # fps should be the minimum constant rate at which the camera can
-        self.fourcc = "MJPG"       # capture images (with no decrease in speed over time; testing is required)
+        self.fps = 15  # fps should be the minimum constant rate at which the camera can
+        self.fourcc = "MJPG"  # capture images (with no decrease in speed over time; testing is required)
         # self.fourcc = "XVID"       # capture images (with no decrease in speed over time; testing is required)
-        self.frameSize = (640,480) # video formats and sizes also depend and vary according to the camera used
-        self.video_filename = "temp_video.avi"
-        self.video_cap = cv2.VideoCapture(self.device_index,cv2.CAP_DSHOW)
-        print(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        self.frameSize = (
+            640, 480
+        )  # video formats and sizes also depend and vary according to the camera used
+        # self.video_filename = "temp_video.avi"
+        # print(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
         self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
-        self.video_out = cv2.VideoWriter(self.video_filename, self.video_writer, self.fps, self.frameSize)
+
         self.frame_counts = 1
         self.start_time = time.time()
-        print(self.video_cap.get(cv2.CAP_PROP_FPS))
+        # print(self.video_cap.get(cv2.CAP_PROP_FPS))
 
-
-    # Video starts being recorded 
-    def record(self):
-
+    # Video starts being recorded
+    def record(self, fileName):
+        self.video_cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
+        self.video_out = cv2.VideoWriter(fileName,
+                                         self.video_writer, self.fps,
+                                         self.frameSize)
         #counter = 1
         # timer_start = time.time()
         # timer_current = 0
-
-
-        while self.open:
+        self.running = True
+        while self.running:
             ret, video_frame = self.video_cap.read()
-            if ret==True:
+            if ret == True:
 
                 self.video_out.write(video_frame)
                 #print str(counter) + " " + str(self.frame_counts) + " frames written " + str(timer_current)
@@ -138,21 +129,20 @@ class VideoRecorder():
                 # cv2.imshow('video_frame', gray)
                 # cv2.waitKey(1)
 
-
-
     def stop(self):
 
-        if self.open:
-            self.open=False
+        if self.running:
+            self.running = False
             self.video_out.release()
             self.video_cap.release()
             cv2.destroyAllWindows()
-
+            return self.fileName
 
 
     # Launches the video recording function using a thread
-    def start(self):
-        video_thread = Thread(target=self.record)
+    def start(self, fileName):
+        self.fileName = fileName
+        video_thread = Thread(target=self.record, args=(fileName,))
         video_thread.start()
 
 
@@ -160,8 +150,8 @@ def timeStamp():
     return datetime.now().strftime('%d%m%Y_%H%M%S')
 
 
-def takeScreenShot(fileName=None):
-    cam = cv2.VideoCapture(0,cv2.CAP_DSHOW)   # 0 -> index of camera
+def takeScreenShot(fileName):
+    cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # 0 -> index of camera
 
     # The resolution of the camera
     # width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
@@ -171,27 +161,24 @@ def takeScreenShot(fileName=None):
     # set resolution of the photo taken
     # cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     # cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-    if not fileName:
-        fileName = f"ScreenShot_{timeStamp()}.jpg"
+
     s, img = cam.read()
-    if s:    # frame captured without any errors
-        cv2.imwrite(fileName,img) #save image
+    if s:  # frame captured without any errors
+        cv2.imwrite(fileName, img)  #save image
     cv2.destroyAllWindows()
     return fileName
 
 
 
+if __name__ == '__main__':
 
 
+    # # import os
+    # # # os.remove('./output_new.wav')
+    # # r = recordAudio()
+    r = VideoRecorder()
+    file = f"Video_{timeStamp()}.avi"
+    r.start(file)
 
-
-
-
-# # import os 
-# # # os.remove('./output_new.wav')
-# # r = recordAudio()
-# r = VideoRecorder()
-# r.start()
-
-# sleep(10)
-# r.stop()
+    sleep(10)
+    r.stop()

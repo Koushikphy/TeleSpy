@@ -2,3 +2,5 @@
 *.jpg
 .env
 *.pyc
+assets
+PyAudio*
