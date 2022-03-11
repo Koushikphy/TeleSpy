@@ -1,7 +1,8 @@
 import os
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from utils import VideoRecorder, recordAudio, takeScreenShot, timeStamp
+from utils import VideoRecorder, AudioRecorder, takeScreenShot, timeStamp
+import moviepy.editor as mpe
 
 
 def getEnv(var, cast=None, isList=False):
@@ -26,8 +27,8 @@ if not os.path.exists(ASSETS_DIR):
 
 
 bot= telebot.TeleBot(TOKEN, parse_mode='HTML')
-audioRecorder = recordAudio()
-vidRec = VideoRecorder()
+audioRecorder = AudioRecorder()
+videoRecorder = VideoRecorder()
 
 
 @bot.message_handler(commands='start')
@@ -54,6 +55,79 @@ def send_screenshot(message):
 
 
 
+
+
+@bot.message_handler(commands='audio')
+def send_audio(message):
+    user = message.from_user.id
+    if user not in ALLOWED_USERS : return
+    if audioRecorder.running: 
+        bot.send_message(user, "Recording already in progress.")
+    else:
+        audioRecorder.start()
+        bot.send_message(user, "Recording started.", reply_markup=audioMarkup())
+
+
+def audioMarkup():
+    markup = InlineKeyboardMarkup()
+    markup.row_width = 2
+    markup.add(InlineKeyboardButton("Finish", callback_data="cb_stop_audio"),
+                InlineKeyboardButton("Cancel", callback_data="cb_cancel_audio"))
+    return markup
+
+
+
+
+
+@bot.message_handler(commands='video')
+def send_video(message):
+    user = message.from_user.id
+    if user not in ALLOWED_USERS : return
+    if videoRecorder.running: 
+        bot.send_message(user, "Recording already in progress.")
+    else:
+        videoRecorder.start()
+        bot.send_message(user, "Recording started.", reply_markup=videoMarkup())
+
+
+
+def videoMarkup():
+    markup = InlineKeyboardMarkup()
+    markup.row_width = 2
+    markup.add(InlineKeyboardButton("Finish", callback_data="cb_stop_video"),
+                InlineKeyboardButton("Cancel", callback_data="cb_cancel_video"))
+    return markup
+
+
+
+
+
+@bot.message_handler(commands='both')
+def send_both(message):
+    user = message.from_user.id
+    if user not in ALLOWED_USERS : return
+    if videoRecorder.running or audioRecorder.running: 
+        bot.send_message(user, "Recording already in progress.")
+    else:
+        audioRecorder.start()
+        videoRecorder.start()
+        bot.send_message(user, "Recording started.", reply_markup=bothMarkup())
+
+
+
+
+def bothMarkup():
+    markup = InlineKeyboardMarkup()
+    markup.row_width = 2
+    markup.add(InlineKeyboardButton("Finish", callback_data="cb_stop_both"),
+                InlineKeyboardButton("Cancel", callback_data="cb_cancel_both"))
+    return markup
+
+
+
+
+
+
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
     # clear the options
@@ -70,71 +144,62 @@ def callback_query(call):
 
     elif call.data == "cb_cancel_audio":
         # break if fail, dont send message again
-        audioRecorder.stop('what_ever',True)
+        audioRecorder.stop()
         bot.send_message(call.from_user.id, "Recording terminated")
+
+
+    #------------------------------------------------------------------------
 
 
     elif call.data == "cb_stop_video":
         message = bot.send_message(call.from_user.id, "Processing please wait")
-        
-        file = vidRec.stop()
+
+        file =os.path.join(ASSETS_DIR, f"Video_{timeStamp()}.avi")
+        videoRecorder.stop(file)
+        # convert to mp4, smaller file size, playable inside telegram
+        my_clip = mpe.VideoFileClip(file)
+        file = file.replace('avi','mp4')
+        my_clip.write_videofile(file,fps=videoRecorder.fps)
+
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         with open(file,'rb') as f:
             bot.send_video(call.from_user.id, f)
 
     elif call.data == "cb_cancel_video":
         # break if fail, dont send message again
-        vidRec.stop('what_ever',True)
+        videoRecorder.stop()
         bot.send_message(call.from_user.id, "Recording terminated")
 
 
+    #-----------------------------------------------------------------
+
+    elif call.data == "cb_stop_both":
+        message = bot.send_message(call.from_user.id, "Processing please wait")
+        audFile =os.path.join(ASSETS_DIR,  'audioTmp.wav')
+        vidFile = os.path.join(ASSETS_DIR, 'videoTmp.avi')
+        audioRecorder.stop(audFile)
+        videoRecorder.stop(vidFile)
+
+        #merging audio and video
+        #WARNING: Problem with syncing
+
+        my_clip = mpe.VideoFileClip(vidFile)
+        audio_background = mpe.AudioFileClip(audFile)
+        final_clip = my_clip.set_audio(audio_background)
+
+        file =os.path.join(ASSETS_DIR, f"Video_{timeStamp()}.mp4")
+        final_clip.write_videofile(file,fps=videoRecorder.fps)
+
+        bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
+        with open(file,'rb') as f:
+            bot.send_video(call.from_user.id, f)
+
+    elif call.data == "cb_cancel_both":
+        # break if fail, dont send message again
+        videoRecorder.stop()
+        bot.send_message(call.from_user.id, "Recording terminated")
 
 
-
-def audioMarkup():
-    markup = InlineKeyboardMarkup()
-    markup.row_width = 2
-    markup.add(InlineKeyboardButton("Finish", callback_data="cb_stop_audio"),
-                InlineKeyboardButton("Cancel", callback_data="cb_cancel_audio"))
-    return markup
-
-
-def videoMarkup():
-    markup = InlineKeyboardMarkup()
-    markup.row_width = 2
-    markup.add(InlineKeyboardButton("Finish", callback_data="cb_stop_video"),
-                InlineKeyboardButton("Cancel", callback_data="cb_cancel_video"))
-    return markup
-
-
-
-
-@bot.message_handler(commands='audio')
-def send_audio(message):
-    user = message.from_user.id
-    if user not in ALLOWED_USERS : return
-    if audioRecorder.running: 
-        bot.send_message(user, "Recording already in progress.")
-    else:
-        audioRecorder.start()
-        bot.send_message(user, "Recording started.", reply_markup=audioMarkup())
-
-
-@bot.message_handler(commands='video')
-def send_video(message):
-    global processing_id
-    user = message.from_user.id
-    if user not in ALLOWED_USERS : return
-    if vidRec.running: 
-        bot.send_message(user, "Recording already in progress.")
-    else:
-        file =os.path.join(ASSETS_DIR, f"Video_{timeStamp()}.avi")
-        vidRec.start(file)
-        chat = bot.send_message(user, "Recording started.", reply_markup=videoMarkup())
-        processing_id = {
-            'message_id' : chat.message_id,
-            'chat_id':chat.chat.id
-        }
 
 
 

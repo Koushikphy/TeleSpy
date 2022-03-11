@@ -1,4 +1,3 @@
-from time import sleep
 # https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
 import pyaudio
 import wave
@@ -6,19 +5,19 @@ from threading import Thread
 import time
 from datetime import datetime
 import cv2
-
+import os
 # pip install opencv-python pyTelegramBotAPI
 # https://stackoverflow.com/questions/14140495/how-to-capture-a-video-and-audio-in-python-from-a-camera-or-webcam
 
 
-class recordAudio:
+class AudioRecorder:
 
     def __init__(self) -> None:
         self.running = False
 
         self.chunk = 1024  # Record in chunks of 1024 samples
         self.sample_format = pyaudio.paInt16  # 16 bits per sample
-        self.channels = 2
+        self.channels = 1
         self.fs = 44100  # Record at 44100 samples per second
 
         self.p = pyaudio.PyAudio()  # Create an interface to PortAudio
@@ -52,31 +51,27 @@ class recordAudio:
         # except Exception as e:
         #     print("exception occured", e)
 
-    def stopRecording(self, filename, dontSave=False):
+    def start(self):
+        self.t = Thread(target=self.startAudio)
+        self.t.start()
 
+    def stop(self, file=None):
+        if not self.running : return
         self.running = False
         # Stop and close the self.stream
         self.stream.stop_stream()
         self.stream.close()
         # Terminate the PortAudio interface
         self.p.terminate()
-        if dontSave:
-            return
-        # print('Finished recording')
-        # Save the recorded data as a WAV file
-        wf = wave.open(filename, 'wb')
-        wf.setnchannels(self.channels)
-        wf.setsampwidth(self.p.get_sample_size(self.sample_format))
-        wf.setframerate(self.fs)
-        wf.writeframes(b''.join(self.frames))
-        wf.close()
-
-    def start(self):
-        self.t = Thread(target=self.startAudio)
-        self.t.start()
-
-    def stop(self, file, dontSave=False):
-        self.stopRecording(file, dontSave)
+        if file: # if file not present then it won't be saved
+            # print('Finished recording')
+            # Save the recorded data as a WAV file
+            wf = wave.open(file, 'wb')
+            wf.setnchannels(self.channels)
+            wf.setsampwidth(self.p.get_sample_size(self.sample_format))
+            wf.setframerate(self.fs)
+            wf.writeframes(b''.join(self.frames))
+            wf.close()
         self.t.join()
 
 
@@ -87,63 +82,71 @@ class VideoRecorder():
         self.running = False
         self.device_index = 0
         self.fps = 15  # fps should be the minimum constant rate at which the camera can
-        self.fourcc = "MJPG"  # capture images (with no decrease in speed over time; testing is required)
-        # self.fourcc = "XVID"       # capture images (with no decrease in speed over time; testing is required)
-        self.frameSize = (
-            640, 480
-        )  # video formats and sizes also depend and vary according to the camera used
-        # self.video_filename = "temp_video.avi"
-        # print(self.video_cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        # self.fourcc = "MJPG"  # capture images (with no decrease in speed over time; testing is required)
+        self.fourcc = "XVID"  # capture images (with no decrease in speed over time; testing is required)
+        self.frames = self.getWidthHeight()
+        self.tempFile = 'temp.avi'
+        # print(self.getWidthHeight())
 
         self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
 
         self.frame_counts = 1
         self.start_time = time.time()
-        # print(self.video_cap.get(cv2.CAP_PROP_FPS))
 
     # Video starts being recorded
-    def record(self, fileName):
+    def record(self):
+        from time import perf_counter_ns, perf_counter
         self.video_cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
-        self.video_out = cv2.VideoWriter(fileName,
-                                         self.video_writer, self.fps,
-                                         self.frameSize)
-        #counter = 1
-        # timer_start = time.time()
-        # timer_current = 0
+
+        self.video_out = cv2.VideoWriter(self.tempFile, self.video_writer, self.fps, self.frames)
+
         self.running = True
+        oldTime = perf_counter()
         while self.running:
-            ret, video_frame = self.video_cap.read()
-            if ret == True:
-
-                self.video_out.write(video_frame)
-                #print str(counter) + " " + str(self.frame_counts) + " frames written " + str(timer_current)
-                # self.frame_counts += 1
-                #counter += 1
-                #timer_current = time.time() - timer_start
-                # time.sleep(0.16)
-
-                # Uncomment the following three lines to make the video to be
-                # displayed to screen while recording
-
+            # opencv doesn't record video in a constant frames per second, so wait for the time to pass before capturing
+            # to make a constant video renderer
+            if (perf_counter() - oldTime) * self.fps > 1:
+                ret, video_frame = self.video_cap.read()
+                if ret:
+                    self.video_out.write(video_frame)
+                oldTime = perf_counter()
                 # gray = cv2.cvtColor(video_frame, cv2.COLOR_BGR2GRAY)
                 # cv2.imshow('video_frame', gray)
                 # cv2.waitKey(1)
 
-    def stop(self):
+    def checkFPS(self):
+        from time import perf_counter
+        cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
+        start = perf_counter()
+        for _ in range(100):
+            ret, video_frame = cap.read()
+            end = perf_counter()
+            print(1 / (end - start))
+            start = end
 
-        if self.running:
-            self.running = False
-            self.video_out.release()
-            self.video_cap.release()
-            cv2.destroyAllWindows()
-            return self.fileName
+    def getWidthHeight(self):
+        cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        cap.release()
+        cv2.destroyAllWindows()
+        return width, height
 
+    def stop(self,file=None):
+        if not self.running: return
+        self.running = False
+        self.video_out.release()
+        self.video_cap.release()
+        cv2.destroyAllWindows()
+        self.th.join()
+        if file:
+            os.replace(self.tempFile, file)
+        
 
     # Launches the video recording function using a thread
-    def start(self, fileName):
-        self.fileName = fileName
-        video_thread = Thread(target=self.record, args=(fileName,))
-        video_thread.start()
+    def start(self):
+        self.th = Thread(target=self.record)
+        self.th.start()
 
 
 def timeStamp():
@@ -169,16 +172,24 @@ def takeScreenShot(fileName):
     return fileName
 
 
-
 if __name__ == '__main__':
-
-
+    from time import sleep
     # # import os
     # # # os.remove('./output_new.wav')
-    # # r = recordAudio()
-    r = VideoRecorder()
-    file = f"Video_{timeStamp()}.avi"
-    r.start(file)
+    ra = AudioRecorder()
+    rv = VideoRecorder()
+    # r.getWidthHeight()
+    # r.checkFPS()
+    filev = f"Video_{timeStamp()}.avi"
+    filea = f"Audio_{timeStamp()}.wav"
+    ra.start()
+    rv.start(filev)
+    sleep(5)
+    ra.stop(filea)
+    rv.stop()
+    import moviepy.editor as mpe
 
-    sleep(10)
-    r.stop()
+    my_clip = mpe.VideoFileClip(filev)
+    audio_background = mpe.AudioFileClip(filea)
+    final_clip = my_clip.set_audio(audio_background)
+    final_clip.write_videofile('test.mp4',fps=15)

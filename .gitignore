@@ -4,3 +4,6 @@
 *.pyc
 assets
 PyAudio*
+*.avi
+*.wav
+*.mp4
