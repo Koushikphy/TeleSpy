@@ -1,17 +1,15 @@
 # https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
-import pyaudio
-import wave
-from threading import Thread
-import time
-from datetime import datetime
-import cv2
 import os
-from time import perf_counter_ns, perf_counter, sleep
+import cv2
+import wave
+import pyaudio
 import subprocess
-import moviepy.editor as mpe
+from threading import Thread
+from datetime import datetime
+from time import perf_counter_ns, perf_counter, sleep,time
+# import moviepy.editor as mpe
 
 
-# pip install opencv-python pyTelegramBotAPI
 # https://stackoverflow.com/questions/14140495/how-to-capture-a-video-and-audio-in-python-from-a-camera-or-webcam
 
 def timeStamp():
@@ -69,7 +67,7 @@ class AudioRecorder:
 
         # Store data in chunks for 3 seconds
         # for i in range(0, int(self.fs / self.chunk * self.seconds)):
-        self.chunkInEachSec = int(self.fs / self.chunk)
+        # self.chunkInEachSec = int(self.fs / self.chunk)
 
         self.stream = self.p.open(format=self.sample_format,
                                   channels=self.channels,
@@ -131,35 +129,35 @@ class VideoRecorder():
         self.fourcc = "XVID"  # capture images (with no decrease in speed over time; testing is required)
         self.frames = self.getWidthHeight()
         self.tempFile = 'temp.avi'
-        if os.path.exists(self.tempFile): os.remove(self.tempFile)
+        removeFile(self.tempFile)
         # print(self.getWidthHeight())
 
         self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
 
         self.frame_counts = 1
         # check this
-        self.video_cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
-        self.video_out = cv2.VideoWriter(self.tempFile, self.video_writer, self.fps, self.frames)
 
 
     # Video starts being recorded
     def record(self):
         self.running = True
 
+        self.video_out = cv2.VideoWriter(self.tempFile, self.video_writer, self.fps, self.frames)
+        self.video_cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
         # check with time instead of perf_counter
 
-        self.starttime = oldTime = perf_counter()
+        self.starttime = time()
         self.framescount = 0
 
         while self.running:
             # opencv doesn't record video in a constant frames per second, so wait for the time to pass before capturing
             # to make a constant video renderer
-            if (perf_counter() - oldTime) * self.fps > 1:
-                ret, video_frame = self.video_cap.read()
-                if ret:
-                    self.video_out.write(video_frame)
-                    self.framescount +=1
-                oldTime = perf_counter()
+            # if (perf_counter() - oldTime) * self.fps > 1:
+            ret, video_frame = self.video_cap.read()
+            if ret and self.video_out.isOpened():
+                self.video_out.write(video_frame)
+                self.framescount +=1
+                # oldTime = perf_counter()
                 # gray = cv2.cvtColor(video_frame, cv2.COLOR_BGR2GRAY)
                 # cv2.imshow('video_frame', gray)
                 # cv2.waitKey(1)
@@ -177,7 +175,7 @@ class VideoRecorder():
         # returns effective frames per seceon
         if not self.running: return
 
-        totalTime = perf_counter() - self.starttime
+        totalTime = time() - self.starttime
         self.running = False
         self.video_out.release()
         self.video_cap.release()
@@ -185,6 +183,7 @@ class VideoRecorder():
         self.th.join()
         if file:
             os.replace(self.tempFile, file)
+            # subprocess.call(f"ffmpeg -r {self.framescount/totalTime} -i {self.tempFile} -r {self.fps} {file}", shell=True)
             return self.framescount/totalTime
 
     # Launches the video recording function using a thread
@@ -199,9 +198,9 @@ def reFFMPEG(iFile, ifFPS, oFile, oFPS):
 
 
 
-def reMoviePy(iFile, oFile, fps=15):
-    my_clip = mpe.VideoFileClip(iFile)
-    my_clip.write_videofile(oFile,fps)
+# def reMoviePy(iFile, oFile, fps=15):
+#     my_clip = mpe.VideoFileClip(iFile)
+#     my_clip.write_videofile(oFile,fps)
 
 
 
@@ -210,12 +209,12 @@ def mergeFFMPEG(videoStream, audioStream, videoOut):
 
 
 
-def mergeMoviePy(videoStream, audioStream, videoOut, fps=15):
+# def mergeMoviePy(videoStream, audioStream, videoOut, fps=15):
 
-    my_clip = mpe.VideoFileClip(videoStream)
-    audio_background = mpe.AudioFileClip(audioStream)
-    final_clip = my_clip.set_audio(audio_background)
-    final_clip.write_videofile(videoOut,fps)
+#     my_clip = mpe.VideoFileClip(videoStream)
+#     audio_background = mpe.AudioFileClip(audioStream)
+#     final_clip = my_clip.set_audio(audio_background)
+#     final_clip.write_videofile(videoOut,fps)
 
 
 
@@ -223,19 +222,18 @@ if __name__ == '__main__':
     # # # os.remove('./output_new.wav')
     ra = AudioRecorder()
     rv = VideoRecorder()
-    # r.getWidthHeight()
-    # r.checkFPS()
+
     filev = f"Video_{timeStamp()}.avi"
     filea = f"Audio_{timeStamp()}.wav"
-    ra.start()
+    # ra.start()
 
     rv.start()
     sleep(5)
-    ra.stop(filea)
+    # ra.stop(filea)
     fps = rv.stop(filev)
 
-    reFFMPEG(filev, fps, 'out.mp4', rv.fps)
+    # reFFMPEG(filev, fps, 'out.mp4', rv.fps)
 
-    mergeFFMPEG('out.mp4', filea, 'outfinal.mp4')
+    # mergeFFMPEG('out.mp4', filea, 'outfinal.mp4')
 
-    mergeMoviePy(filev,filea,'outmvpy.mp4',rv.fps)
+    # mergeMoviePy(filev,filea,'outmvpy.mp4',rv.fps)
