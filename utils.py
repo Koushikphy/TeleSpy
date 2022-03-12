@@ -102,13 +102,16 @@ class VideoRecorder():
 
         self.running = True
         oldTime = perf_counter()
+        self.framescount = 0
+        self.starttime = oldTime
         while self.running:
-            # opencv doesn't record video in a constant frames per second, so wait for the time to pass before capturing
+            # opencv doesn't record video in a constant self.framescount per second, so wait for the time to pass before capturing
             # to make a constant video renderer
             if (perf_counter() - oldTime) * self.fps > 1:
                 ret, video_frame = self.video_cap.read()
                 if ret:
                     self.video_out.write(video_frame)
+                    self.framescount +=1
                 oldTime = perf_counter()
                 # gray = cv2.cvtColor(video_frame, cv2.COLOR_BGR2GRAY)
                 # cv2.imshow('video_frame', gray)
@@ -134,6 +137,9 @@ class VideoRecorder():
 
     def stop(self,file=None):
         if not self.running: return
+        from time import perf_counter_ns, perf_counter
+
+        tt = perf_counter() - self.starttime
         self.running = False
         self.video_out.release()
         self.video_cap.release()
@@ -141,7 +147,8 @@ class VideoRecorder():
         self.th.join()
         if file:
             os.replace(self.tempFile, file)
-        
+        return self.framescount/tt
+                
 
     # Launches the video recording function using a thread
     def start(self):
@@ -183,10 +190,22 @@ if __name__ == '__main__':
     filev = f"Video_{timeStamp()}.avi"
     filea = f"Audio_{timeStamp()}.wav"
     ra.start()
-    rv.start(filev)
+    from time import perf_counter
+    st = perf_counter()
+    rv.start()
     sleep(5)
     ra.stop(filea)
-    rv.stop()
+    ff = rv.stop(filev)
+    end = perf_counter()
+
+    
+    
+
+    import subprocess
+    subprocess.call(f"ffmpeg -r {ff} -i {filev} -pix_fmt yuv420p -r {rv.fps} out.mp4", shell=True)
+    # os.remove('out.mp4')
+    subprocess.call(f"ffmpeg -ac 2 -channel_layout stereo -i out.mp4 -i {filea} outfinal.mp4", shell=True)
+
     import moviepy.editor as mpe
 
     my_clip = mpe.VideoFileClip(filev)
