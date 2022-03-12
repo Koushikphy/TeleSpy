@@ -6,6 +6,9 @@ import time
 from datetime import datetime
 import cv2
 import os
+from time import perf_counter_ns, perf_counter, sleep
+
+
 # pip install opencv-python pyTelegramBotAPI
 # https://stackoverflow.com/questions/14140495/how-to-capture-a-video-and-audio-in-python-from-a-camera-or-webcam
 
@@ -52,8 +55,8 @@ class AudioRecorder:
         #     print("exception occured", e)
 
     def start(self):
-        self.t = Thread(target=self.startAudio)
-        self.t.start()
+        self.th = Thread(target=self.startAudio)
+        self.th.start()
 
     def stop(self, file=None):
         if not self.running : return
@@ -72,7 +75,7 @@ class AudioRecorder:
             wf.setframerate(self.fs)
             wf.writeframes(b''.join(self.frames))
             wf.close()
-        self.t.join()
+        self.th.join()
 
 
 class VideoRecorder():
@@ -91,21 +94,22 @@ class VideoRecorder():
         self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
 
         self.frame_counts = 1
-        self.start_time = time.time()
+        # check this
+        self.video_cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
+        self.video_out = cv2.VideoWriter(self.tempFile, self.video_writer, self.fps, self.frames)
+
 
     # Video starts being recorded
     def record(self):
-        from time import perf_counter_ns, perf_counter
-        self.video_cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
-
-        self.video_out = cv2.VideoWriter(self.tempFile, self.video_writer, self.fps, self.frames)
-
         self.running = True
-        oldTime = perf_counter()
+
+        # check with time instead of perf_counter
+
+        self.starttime = oldTime = perf_counter()
         self.framescount = 0
-        self.starttime = oldTime
+
         while self.running:
-            # opencv doesn't record video in a constant self.framescount per second, so wait for the time to pass before capturing
+            # opencv doesn't record video in a constant frames per second, so wait for the time to pass before capturing
             # to make a constant video renderer
             if (perf_counter() - oldTime) * self.fps > 1:
                 ret, video_frame = self.video_cap.read()
@@ -117,15 +121,6 @@ class VideoRecorder():
                 # cv2.imshow('video_frame', gray)
                 # cv2.waitKey(1)
 
-    def checkFPS(self):
-        from time import perf_counter
-        cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
-        start = perf_counter()
-        for _ in range(100):
-            ret, video_frame = cap.read()
-            end = perf_counter()
-            print(1 / (end - start))
-            start = end
 
     def getWidthHeight(self):
         cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
@@ -136,10 +131,10 @@ class VideoRecorder():
         return width, height
 
     def stop(self,file=None):
+        # returns effective frames per seceon
         if not self.running: return
-        from time import perf_counter_ns, perf_counter
 
-        tt = perf_counter() - self.starttime
+        totalTime = perf_counter() - self.starttime
         self.running = False
         self.video_out.release()
         self.video_cap.release()
@@ -147,8 +142,7 @@ class VideoRecorder():
         self.th.join()
         if file:
             os.replace(self.tempFile, file)
-        return self.framescount/tt
-                
+            return self.framescount/totalTime
 
     # Launches the video recording function using a thread
     def start(self):
@@ -180,8 +174,6 @@ def takeScreenShot(fileName):
 
 
 if __name__ == '__main__':
-    from time import sleep
-    # # import os
     # # # os.remove('./output_new.wav')
     ra = AudioRecorder()
     rv = VideoRecorder()
@@ -190,19 +182,18 @@ if __name__ == '__main__':
     filev = f"Video_{timeStamp()}.avi"
     filea = f"Audio_{timeStamp()}.wav"
     ra.start()
-    from time import perf_counter
-    st = perf_counter()
+
     rv.start()
     sleep(5)
     ra.stop(filea)
-    ff = rv.stop(filev)
-    end = perf_counter()
+    fps = rv.stop(filev)
+
 
     
     
 
     import subprocess
-    subprocess.call(f"ffmpeg -r {ff} -i {filev} -pix_fmt yuv420p -r {rv.fps} out.mp4", shell=True)
+    subprocess.call(f"ffmpeg -r {fps} -i {filev} -pix_fmt yuv420p -r {rv.fps} out.mp4", shell=True)
     # os.remove('out.mp4')
     subprocess.call(f"ffmpeg -ac 2 -channel_layout stereo -i out.mp4 -i {filea} outfinal.mp4", shell=True)
 
