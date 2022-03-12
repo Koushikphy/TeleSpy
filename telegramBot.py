@@ -1,17 +1,8 @@
 import os
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from utils import VideoRecorder, AudioRecorder, takeScreenShot, timeStamp
-import moviepy.editor as mpe
+from utils import * #
 
-
-def getEnv(var, cast=None, isList=False):
-    value = os.getenv(var)
-    if isList:
-        value = [ cast(i) if cast else i for i in value.split()]
-    if cast and not isList:
-        value = cast(value)
-    return value
 
 
 TOKEN = getEnv('TOKEN')
@@ -155,11 +146,12 @@ def callback_query(call):
         message = bot.send_message(call.from_user.id, "Processing please wait")
 
         file =os.path.join(ASSETS_DIR, f"Video_{timeStamp()}.avi")
-        videoRecorder.stop(file)
+        eFPS = videoRecorder.stop(file)
+
         # convert to mp4, smaller file size, playable inside telegram
-        my_clip = mpe.VideoFileClip(file)
-        file = file.replace('avi','mp4')
-        my_clip.write_videofile(file,fps=videoRecorder.fps)
+        reFFMPEG(file, eFPS, 'ff'+file.replace('avi','mp4'), videoRecorder.fps)
+        reMoviePy(file, 'mv'+file.replace('avi','mp4'), videoRecorder.fps)
+
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         with open(file,'rb') as f:
@@ -178,17 +170,17 @@ def callback_query(call):
         audFile =os.path.join(ASSETS_DIR,  'audioTmp.wav')
         vidFile = os.path.join(ASSETS_DIR, 'videoTmp.avi')
         audioRecorder.stop(audFile)
-        videoRecorder.stop(vidFile)
+        eFPS = videoRecorder.stop(vidFile)
 
         #merging audio and video
         #WARNING: Problem with syncing
+        reFFMPEG(vidFile, eFPS, 'ff_tmp.mp4', videoRecorder.fps)
+        mergeFFMPEG('ff_tmp.mp4',audFile, 'ff_out.mp4')
+        mergeMoviePy(vidFile, audFile, 'mv_out.mp4', videoRecorder.fps)
 
-        my_clip = mpe.VideoFileClip(vidFile)
-        audio_background = mpe.AudioFileClip(audFile)
-        final_clip = my_clip.set_audio(audio_background)
+
 
         file =os.path.join(ASSETS_DIR, f"Video_{timeStamp()}.mp4")
-        final_clip.write_videofile(file,fps=videoRecorder.fps)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         with open(file,'rb') as f:

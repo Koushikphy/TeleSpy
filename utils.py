@@ -7,10 +7,52 @@ from datetime import datetime
 import cv2
 import os
 from time import perf_counter_ns, perf_counter, sleep
+import subprocess
+import moviepy.editor as mpe
 
 
 # pip install opencv-python pyTelegramBotAPI
 # https://stackoverflow.com/questions/14140495/how-to-capture-a-video-and-audio-in-python-from-a-camera-or-webcam
+
+def timeStamp():
+    return datetime.now().strftime('%d%m%Y_%H%M%S')
+
+
+def takeScreenShot(fileName):
+    cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # 0 -> index of camera
+
+    # The resolution of the camera
+    # width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
+    # height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
+    # print(width, height)
+
+    # set resolution of the photo taken
+    # cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+    # cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
+    s, img = cam.read()
+    if s:  # frame captured without any errors
+        cv2.imwrite(fileName, img)  #save image
+    cv2.destroyAllWindows()
+    return fileName
+
+
+
+
+def getEnv(var, cast=None, isList=False):
+    value = os.getenv(var)
+    if isList:
+        value = [ cast(i) if cast else i for i in value.split()]
+    if cast and not isList:
+        value = cast(value)
+    return value
+
+
+
+def removeFile(*fileList):
+    for file in fileList:
+        if(os.path.exists(file)): 
+            os.remove(file)
 
 
 class AudioRecorder:
@@ -81,14 +123,15 @@ class AudioRecorder:
 class VideoRecorder():
 
     # Video class based on openCV
-    def __init__(self):
+    def __init__(self,fps=15):
         self.running = False
         self.device_index = 0
-        self.fps = 15  # fps should be the minimum constant rate at which the camera can
+        self.fps = fps  # fps should be the minimum constant rate at which the camera can
         # self.fourcc = "MJPG"  # capture images (with no decrease in speed over time; testing is required)
         self.fourcc = "XVID"  # capture images (with no decrease in speed over time; testing is required)
         self.frames = self.getWidthHeight()
         self.tempFile = 'temp.avi'
+        if os.path.exists(self.tempFile): os.remove(self.tempFile)
         # print(self.getWidthHeight())
 
         self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
@@ -150,27 +193,30 @@ class VideoRecorder():
         self.th.start()
 
 
-def timeStamp():
-    return datetime.now().strftime('%d%m%Y_%H%M%S')
+def reFFMPEG(iFile, ifFPS, oFile, oFPS):
+    # change fps of the video file
+    subprocess.call(f"ffmpeg -r {ifFPS} -i {iFile} -r {oFPS} {oFile}", shell=True)
 
 
-def takeScreenShot(fileName):
-    cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # 0 -> index of camera
 
-    # The resolution of the camera
-    # width = cap.get(cv2.CAP_PROP_FRAME_WIDTH)
-    # height = cap.get(cv2.CAP_PROP_FRAME_HEIGHT)
-    # print(width, height)
+def reMoviePy(iFile, oFile, fps=15):
+    my_clip = mpe.VideoFileClip(iFile)
+    my_clip.write_videofile(oFile,fps)
 
-    # set resolution of the photo taken
-    # cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-    # cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-    s, img = cam.read()
-    if s:  # frame captured without any errors
-        cv2.imwrite(fileName, img)  #save image
-    cv2.destroyAllWindows()
-    return fileName
+
+def mergeFFMPEG(videoStream, audioStream, videoOut):
+    subprocess.call(f"ffmpeg -ac 2 -channel_layout stereo -i {videoStream} -i {audioStream} {videoOut}", shell=True)
+
+
+
+def mergeMoviePy(videoStream, audioStream, videoOut, fps=15):
+
+    my_clip = mpe.VideoFileClip(videoStream)
+    audio_background = mpe.AudioFileClip(audioStream)
+    final_clip = my_clip.set_audio(audio_background)
+    final_clip.write_videofile(videoOut,fps)
+
 
 
 if __name__ == '__main__':
@@ -188,18 +234,8 @@ if __name__ == '__main__':
     ra.stop(filea)
     fps = rv.stop(filev)
 
+    reFFMPEG(filev, fps, 'out.mp4', rv.fps)
 
-    
-    
+    mergeFFMPEG('out.mp4', filea, 'outfinal.mp4')
 
-    import subprocess
-    subprocess.call(f"ffmpeg -r {fps} -i {filev} -pix_fmt yuv420p -r {rv.fps} out.mp4", shell=True)
-    # os.remove('out.mp4')
-    subprocess.call(f"ffmpeg -ac 2 -channel_layout stereo -i out.mp4 -i {filea} outfinal.mp4", shell=True)
-
-    import moviepy.editor as mpe
-
-    my_clip = mpe.VideoFileClip(filev)
-    audio_background = mpe.AudioFileClip(filea)
-    final_clip = my_clip.set_audio(audio_background)
-    final_clip.write_videofile('test.mp4',fps=15)
+    mergeMoviePy(filev,filea,'outmvpy.mp4',rv.fps)
