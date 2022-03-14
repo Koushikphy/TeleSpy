@@ -2,6 +2,45 @@ import os
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from utils import * #
+from threading import Timer
+
+
+
+
+class RepeatTimer(Timer):
+    def run(self):
+        while not self.finished.wait(self.interval):
+            self.function(*self.args, **self.kwargs)
+
+# remind the user when a long recording in progress
+class Reminder:
+    def __init__(self):
+        self.timeOut = 60*10 # interval to notify the user
+        self.timer = None
+        self.userid = None
+        self.message = None
+
+    def remind(self, userid):
+        self.userid = userid
+        self.timer = RepeatTimer( self.timeOut, self.nudge)
+        self.timer.start()
+        
+
+    def nudge(self):
+        if self.message:
+            bot.delete_message(self.message.chat.id, self.message.message_id)
+        self.message = bot.send_message(self.userid, "Recording in progress. Don't forget to finish")
+
+    def cancel(self):
+        self.message = None
+        self.userid = None
+        self.timer.cancel()
+
+remind = Reminder()
+
+
+
+
 
 
 
@@ -10,12 +49,14 @@ ALLOWED_USERS=getEnv('ALLOWED_USERS', cast=int, isList=True)
 ASSETS_DIR = 'assets'
 
 if not os.path.exists(ASSETS_DIR): os.makedirs(ASSETS_DIR)
-
+removeFile('ffmpeg.log')
 
 
 bot= telebot.TeleBot(TOKEN, parse_mode='HTML')
 audioRecorder = AudioRecorder()
 videoRecorder = VideoRecorder()
+
+
 
 
 
@@ -33,6 +74,9 @@ def send_welcome(message):
 @bot.message_handler(commands='photo')
 def send_screenshot(message):
     user = message.from_user.id
+    if videoRecorder.isRunning():
+        bot.send_message(user, "Video recording is in progress. Can't capture photo")
+        return
 
     if user not in ALLOWED_USERS : return
     fileName = os.path.join(ASSETS_DIR,f"ScreenShot_{timeStamp()}.jpg")
@@ -51,11 +95,12 @@ def send_screenshot(message):
 def send_audio(message):
     user = message.from_user.id
     if user not in ALLOWED_USERS : return
-    if audioRecorder.running: 
+    if audioRecorder.isRunning(): 
         bot.send_message(user, "Recording already in progress.")
     else:
         audioRecorder.start()
-        bot.send_message(user, "Recording started.", reply_markup=audioMarkup())
+        bot.send_message(user, "Recording in progress.", reply_markup=audioMarkup())
+        remind.remind(user)
 
 
 def audioMarkup():
@@ -73,11 +118,12 @@ def audioMarkup():
 def send_video(message):
     user = message.from_user.id
     if user not in ALLOWED_USERS : return
-    if videoRecorder.running: 
+    if videoRecorder.isRunning(): 
         bot.send_message(user, "Recording already in progress.")
     else:
         videoRecorder.start()
-        bot.send_message(user, "Recording started.", reply_markup=videoOnlyMarkup())
+        bot.send_message(user, "Recording in progress.", reply_markup=videoOnlyMarkup())
+        remind.remind(user)
 
 
 
@@ -96,12 +142,13 @@ def videoOnlyMarkup():
 def send_both(message):
     user = message.from_user.id
     if user not in ALLOWED_USERS : return
-    if videoRecorder.running or audioRecorder.running: 
+    if videoRecorder.isRunning() or audioRecorder.isRunning(): 
         bot.send_message(user, "Recording already in progress.")
     else:
         audioRecorder.start()
         videoRecorder.start()
-        bot.send_message(user, "Recording started.", reply_markup=videoMarkup())
+        bot.send_message(user, "Recording in progress.", reply_markup=videoMarkup())
+        remind.remind(user)
 
 
 
@@ -120,10 +167,13 @@ def videoMarkup():
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    # clear the options
-    
+    # clear all reminder
+    remind.cancel()
     bot.edit_message_reply_markup(message_id=call.message.id, chat_id=call.message.chat.id, reply_markup=None)
     if call.data == "cb_stop_audio":
+        if not audioRecorder.isRunning():
+            bot.send_message("No recording is currently in progress !!!")
+            return
         message = bot.send_message(call.from_user.id, "Processing please wait")
 
         file =os.path.join(ASSETS_DIR, f"Audio_{timeStamp()}.wav")
@@ -145,6 +195,9 @@ def callback_query(call):
 
 
     elif call.data == "cb_stop_videoonly":
+        if not videoRecorder.isRunning():
+            bot.send_message("No recording is currently in progress !!!")
+            return
         message = bot.send_message(call.from_user.id, "Processing please wait")
 
         file =os.path.join(ASSETS_DIR, f"Video_{timeStamp()}.avi")
@@ -172,6 +225,9 @@ def callback_query(call):
     #-----------------------------------------------------------------
 
     elif call.data == "cb_stop_video":
+        if not audioRecorder.isRunning() or not videoRecorder.isRunning():
+            bot.send_message("No recording is currently in progress !!!")
+            return
         message = bot.send_message(call.from_user.id, "Processing please wait")
         audFile =os.path.join(ASSETS_DIR, 'audioTmp.wav')
         vidFile = os.path.join(ASSETS_DIR, 'videoTmp.avi')
@@ -201,6 +257,7 @@ def callback_query(call):
         videoRecorder.stop()
         audioRecorder.stop()
         bot.send_message(call.from_user.id, "Recording terminated")
+
 
 
 
