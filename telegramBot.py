@@ -1,17 +1,11 @@
-import os
-import telebot
+from utils import * 
+from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-from utils import *  #
 
 TOKEN = getEnv('TOKEN')
 ALLOWED_USERS = getEnv('ALLOWED_USERS', cast=int, isList=True)
-ASSETS_DIR = 'assets'
 
-if not os.path.exists(ASSETS_DIR):
-    os.makedirs(ASSETS_DIR)
-removeFile('ffmpeg.log')
-
-bot = telebot.TeleBot(TOKEN, parse_mode='HTML')
+bot = TeleBot(TOKEN, parse_mode='HTML')
 audioRecorder = AudioRecorder()
 videoRecorder = VideoRecorder()
 
@@ -73,11 +67,9 @@ def send_screenshot(message):
         bot.send_message(user, "Video recording is in progress. Can't capture photo.")
         return
 
-    fileName = os.path.join(ASSETS_DIR, f"ScreenShot_{timeStamp()}.jpg")
-
     message = bot.send_message(message.from_user.id, "Wait while the bot takes the photo")
-    takeScreenShot(fileName)
-    with open(fileName, 'rb') as f:
+    file = takeScreenShot()
+    with open(file, 'rb') as f:
         bot.send_photo(user, f)
     bot.delete_message(message.chat.id, message.message_id)
 
@@ -151,8 +143,7 @@ def videoMarkup():
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    # clear all reminder
-    remind.cancel()
+    remind.cancel()  # clear all reminder
     user = call.from_user.id
     bot.edit_message_reply_markup(message_id=call.message.id, chat_id=call.message.chat.id, reply_markup=None)
     if call.data == "cb_stop_audio":
@@ -161,8 +152,7 @@ def callback_query(call):
             return
         message = bot.send_message(user, "Processing please wait")
 
-        file = os.path.join(ASSETS_DIR, f"Audio_{timeStamp()}.wav")
-        audioRecorder.stop(file)
+        file = audioRecorder.finish()
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         message = bot.send_message(user, "Wait while the bot uploads the audio")
 
@@ -171,8 +161,7 @@ def callback_query(call):
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_audio":
-        # break if fail, don't send message again
-        audioRecorder.stop()
+        audioRecorder.terminate()
         bot.send_message(user, "Recording terminated")
 
     #------------------------------------------------------------------------
@@ -183,56 +172,42 @@ def callback_query(call):
             return
         message = bot.send_message(user, "Processing please wait")
 
-        file = os.path.join(ASSETS_DIR, f"Video_{timeStamp()}.avi")
-        fileO = file.replace('avi', 'mp4')
-        eFPS = videoRecorder.stop(file)
-
-        # convert to mp4, smaller file size, playable inside telegram
-        reFFMPEG(file, eFPS, fileO, videoRecorder.fps)
-        # reMoviePy(file, 'mv'+file.replace('avi','mp4'), videoRecorder.fps)
+        file = videoRecorder.finish()
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         message = bot.send_message(user, "Wait while the bot uploads the video")
 
-        with open(fileO, 'rb') as f:
+        with open(file, 'rb') as f:
             bot.send_video(user, f)
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_videoonly":
-        # break if fail, don't send message again
-        videoRecorder.stop()
+        videoRecorder.terminate()
         bot.send_message(user, "Recording terminated")
 
     #-----------------------------------------------------------------
-
     elif call.data == "cb_stop_video":
         if not audioRecorder.isRunning() or not videoRecorder.isRunning():
             bot.send_message(user, "No recording is currently in progress !!!")
             return
         message = bot.send_message(user, "Processing please wait")
-        audFile = os.path.join(ASSETS_DIR, 'audioTmp.wav')
-        vidFile = os.path.join(ASSETS_DIR, 'videoTmp.avi')
-        removeFile(audFile, vidFile)
-        fileO = os.path.join(ASSETS_DIR, f"Video_{timeStamp()}.mp4")
-        audioRecorder.stop(audFile)
-        eFPS = videoRecorder.stop(vidFile)
 
-        tmpFile = fileO.replace('.mp4', '_tmp.mp4')
-        reFFMPEG(vidFile, eFPS, tmpFile, videoRecorder.fps)
-        #merging audio and video
-        mergeFFMPEG(tmpFile, audFile, fileO)
-        # mergeMoviePy(vidFile, audFile, 'mv_out.mp4', videoRecorder.fps)
+        audFile = audioRecorder.finish()
+        vidFile = videoRecorder.finish()
+
+        file = getFileName('Video', 'mp4')
+        mergeFFMPEG(vidFile, audFile, file)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         message = bot.send_message(user, "Wait while the bot uploads the video")
-        with open(fileO, 'rb') as f:
+        with open(file, 'rb') as f:
             bot.send_video(user, f)
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_video":
         # break if fail, don't send message again
-        videoRecorder.stop()
-        audioRecorder.stop()
+        videoRecorder.terminate()
+        audioRecorder.terminate()
         bot.send_message(user, "Recording terminated")
 
 

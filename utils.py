@@ -4,17 +4,28 @@ import cv2
 import wave
 import pyaudio
 import subprocess
-from threading import Thread, Timer
+from time import sleep, time
 from datetime import datetime
-from time import perf_counter_ns, perf_counter, sleep, time
+from threading import Thread, Timer
 # import moviepy.editor as mpe
-import typing
+
+ASSETS_DIR = 'assets'
 
 # https://stackoverflow.com/questions/14140495/how-to-capture-a-video-and-audio-in-python-from-a-camera-or-webcam
 
+class RepeatTimer(Timer):
 
-def timeStamp():
-    return datetime.now().strftime('%d%m%Y_%H%M%S')
+    def run(self):
+        while not self.finished.wait(self.interval):
+            self.function(*self.args, **self.kwargs)
+
+
+def getFileName(name: str, ext: str) -> str:
+    now = datetime.now()
+    fileName = f"{name}_{now.strftime('%H_%M_%S')}.{ext}"
+    dirPath = os.path.join(ASSETS_DIR, f"{now.strftime('%d_%m_%Y')}")
+    os.makedirs(dirPath, exist_ok=True)
+    return os.path.join(dirPath, fileName)
 
 
 def getEnv(var, cast=None, isList=False):
@@ -32,7 +43,7 @@ def removeFile(*fileList):
             os.remove(file)
 
 
-def takeScreenShot(fileName):
+def takeScreenShot():
     cam = cv2.VideoCapture(0, cv2.CAP_DSHOW)  # 0 -> index of camera
 
     # The resolution of the camera
@@ -43,18 +54,18 @@ def takeScreenShot(fileName):
     # set resolution of the photo taken
     # cam.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
     # cam.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
-
+    file = getFileName('Photo', 'jpg')
     s, img = cam.read()
     if s:  # frame captured without any errors
-        cv2.imwrite(fileName, img)  #save image
+        cv2.imwrite(file, img)  #save image
     cv2.destroyAllWindows()
-    return fileName
+    return file
 
 
 class AudioRecorder:
 
     def __init__(self) -> None:
-
+        self._running = False
         self.chunk = 1024  # Record in chunks of 1024 samples
         self.sample_format = pyaudio.paInt16  # 16 bits per sample
         self.channels = 1  # channels for input
@@ -62,6 +73,7 @@ class AudioRecorder:
         self.port = pyaudio.PyAudio()  # Create an interface to PortAudio
 
     def startAudio(self):
+        self._running = True
         self.frames = []  # Initialize array to store frames
         self.stream = self.port.open(format=self.sample_format,
                                      channels=self.channels,
@@ -73,30 +85,37 @@ class AudioRecorder:
             self.frames.append(self.stream.read(self.chunk))
 
     def isRunning(self):
-        try:
-            return self.stream.is_active()
-        except:
-            return False
+        return self._running
+        # try:
+        #     return self.stream.is_active()
+        # except:
+        #     return False
 
     def start(self):
         self.th = Thread(target=self.startAudio)
         self.th.start()
 
-    def stop(self, file=None):
-        if self.stream.is_stopped():
-            return  # noting to stop anymore
+    def closeCapture(self):
+        self._running = False
         self.stream.stop_stream()
         self.stream.close()
         self.th.join()
 
-        if file:  # if file not present then it won't be saved
-            # Save the recorded data as a WAV file
+    def terminate(self):
+        if self.isRunning():
+            self.closeCapture()
+
+    def finish(self):
+        if self.isRunning():
+            self.closeCapture()
+            file = getFileName('Audio', 'wav')
             wf = wave.open(file, 'wb')
             wf.setnchannels(self.channels)
             wf.setsampwidth(self.port.get_sample_size(self.sample_format))
             wf.setframerate(self.fs)
             wf.writeframes(b''.join(self.frames))
             wf.close()
+            return file
 
 
 class VideoRecorder():
@@ -109,41 +128,37 @@ class VideoRecorder():
     # then the fps of the video is fixed using `ffmpeg`
 
     def __init__(self, fps=15):
-        self.running = False
+        self._running = False
         self.device_index = 0
         self.fps = fps
-        # self.fourcc = "MJPG"
-        self.fourcc = "XVID"
+        self.fourcc = "XVID" #"MJPG"
         self.frames = self.getWidthHeight()
-        self.tempFile = 'temp.avi'
-        removeFile(self.tempFile)
         self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
         self.frame_counts = 1
 
     def isRunning(self):
-        try:
-            return self.video_out.isOpened()
-        except:  # if not video writer is not opened
-            return False
+        return self._running
+        # try:
+        #     return self.video_out.isOpened()
+        # except:  # if not video writer is not opened
+        #     return False
 
-    # Video starts being recorded
     def record(self):
+        self._running = True
+        self.tempFile = getFileName('Temp','avi') # opencv in this fourcc only records in avi
         self.video_out = cv2.VideoWriter(self.tempFile, self.video_writer, self.fps, self.frames)
         self.video_cap = cv2.VideoCapture(self.device_index, cv2.CAP_DSHOW)
-        # check with time instead of perf_counter
 
         self.starttime = time()
         self.framescount = 0
 
         while self.video_cap.isOpened():
-            # opencv doesn't record video in a constant frames per second, so wait for the time to pass before capturing
-            # to make a constant video renderer
 
             ret, video_frame = self.video_cap.read()
             if ret and self.video_out.isOpened():
                 self.video_out.write(video_frame)
                 self.framescount += 1
-
+                # show the video in a window
                 # cv2.imshow('video_frame', gray)
                 # cv2.waitKey(1)
 
@@ -156,29 +171,36 @@ class VideoRecorder():
         cv2.destroyAllWindows()
         return width, height
 
-    def stop(self, file=None):
-        # stop video recording and returns effective frames per seceond
-        if not self.video_out.isOpened():
-            return
-
-        totalTime = time() - self.starttime
-        self.video_cap.release()
-        self.video_out.release()
-        cv2.destroyAllWindows()
-        self.th.join()
-        if file:
-            os.replace(self.tempFile, file)
-            return self.framescount / totalTime
-
     def start(self):
         # start the video recording in a new thread
         self.th = Thread(target=self.record)
         self.th.start()
 
+    def closeCapture(self):
+        self._running = False
+        totalTime = time() - self.starttime
+        self.video_cap.release()
+        self.video_out.release()
+        cv2.destroyAllWindows()
+        self.th.join()
+        return totalTime
+
+    def terminate(self):
+        if self.isRunning():
+            self.closeCapture()
+
+    def finish(self):
+        if self.isRunning():
+            totalTime = self.closeCapture()
+            thisFPS = self.framescount / totalTime
+            fileName = getFileName('Video', 'mp4')
+            reFFMPEG(self.tempFile, thisFPS, fileName, self.fps)
+            return fileName
+
 
 def reFFMPEG(iFile, ifFPS, oFile, oFPS):
     # change fps of the video file, writes output to `ffmpeg.log`
-    subprocess.call(f"ffmpeg -r {ifFPS} -i {iFile} -r {oFPS} {oFile} >> ffmpeg.log 2>&1", shell=True)
+    subprocess.call(f"ffmpeg -y -r {ifFPS} -i {iFile} -r {oFPS} {oFile} >> ffmpeg.log 2>&1", shell=True)
 
 
 # def reMoviePy(iFile, oFile, fps=15):
@@ -189,7 +211,7 @@ def reFFMPEG(iFile, ifFPS, oFile, oFPS):
 def mergeFFMPEG(videoStream, audioStream, videoOut):
     # merge audio and video stream, writes output to `ffmpeg.log`
     subprocess.call(
-        f"ffmpeg -ac 2 -channel_layout stereo -i {videoStream} -i {audioStream} {videoOut} >> ffmpeg.log 2>&1",
+        f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
 
 
@@ -200,11 +222,6 @@ def mergeFFMPEG(videoStream, audioStream, videoOut):
 #     final_clip.write_videofile(videoOut,fps)
 
 
-class RepeatTimer(Timer):
-
-    def run(self):
-        while not self.finished.wait(self.interval):
-            self.function(*self.args, **self.kwargs)
 
 
 if __name__ == '__main__':
@@ -212,25 +229,12 @@ if __name__ == '__main__':
     ra = AudioRecorder()
     rv = VideoRecorder()
 
-    filev = f"Video_{timeStamp()}.avi"
-    filea = f"Audio_{timeStamp()}.wav"
-    # ra.start()
-
+    ra.start()
     rv.start()
     sleep(1)
-    # ra.stop(filea)
-    rv.stop()
+    audFile = ra.finish()
+    vidFile = rv.finish()
 
-    # ra.start()
-
-    # rv.start()
-    # sleep(1)
-    # ra.stop(filea)
-
-    # fps = rv.stop(filev)
-
-    # reFFMPEG(filev, fps, 'out.mp4', rv.fps)
-
-    # mergeFFMPEG('out.mp4', filea, 'outfinal.mp4')
-
-    # mergeMoviePy(filev,filea,'outmvpy.mp4',rv.fps)
+    file = getFileName('Video', 'mp4')
+    print(audFile, vidFile, file)
+    mergeFFMPEG(vidFile, audFile, file)
