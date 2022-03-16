@@ -8,3 +8,4 @@ PyAudio*
 *.wav
 *.mp4
 *.log
+test*
