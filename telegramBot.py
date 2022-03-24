@@ -156,8 +156,11 @@ def callback_query(call):
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         message = bot.send_message(user, "Wait while the bot uploads the audio")
 
-        with open(file, 'rb') as f:
-            bot.send_audio(user, f)
+        try:
+            with open(file, 'rb') as f:
+                bot.send_audio(user, f)
+        except:
+            bot.send_message(user, f"Something went wrong while uploading the audio file. You can find the audio stored as {file}")
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_audio":
@@ -177,8 +180,11 @@ def callback_query(call):
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         message = bot.send_message(user, "Wait while the bot uploads the video")
 
-        with open(file, 'rb') as f:
-            bot.send_video(user, f)
+        try:
+            with open(file, 'rb') as f:
+                bot.send_video(user, f)
+        except:
+            bot.send_message(user, f"Something went wrong while uploading the video file. You can find the video stored as {file}")
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_videoonly":
@@ -200,8 +206,11 @@ def callback_query(call):
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         message = bot.send_message(user, "Wait while the bot uploads the video")
-        with open(file, 'rb') as f:
-            bot.send_video(user, f)
+        try:
+            with open(file, 'rb') as f:
+                bot.send_video(user, f)
+        except:
+            bot.send_message(user, f"Something went wrong while uploading the video file. You can find the video stored as {file}")
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_video":
