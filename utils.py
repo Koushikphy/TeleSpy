@@ -201,6 +201,7 @@ class VideoRecorder():
 def reFFMPEG(iFile, ifFPS, oFile, oFPS):
     # change fps of the video file, writes output to `ffmpeg.log`
     subprocess.call(f"ffmpeg -y -r {ifFPS} -i {iFile} -r {oFPS} {oFile} >> ffmpeg.log 2>&1", shell=True)
+    os.remove(iFile) # remove the temporary file
 
 
 # def reMoviePy(iFile, oFile, fps=15):
@@ -213,6 +214,8 @@ def mergeFFMPEG(videoStream, audioStream, videoOut):
     subprocess.call(
         f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
+    os.remove(videoStream)
+    os.remove(audioStream)
 
 
 # def mergeMoviePy(videoStream, audioStream, videoOut, fps=15):
