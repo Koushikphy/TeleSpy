@@ -220,4 +220,19 @@ def callback_query(call):
         bot.send_message(user, "Recording terminated")
 
 
-bot.infinity_polling()
+
+
+def crashTheCode():
+    import os 
+    os._exit(1)
+
+Timer(12*3600,crashTheCode).start() # crash after 12 hours
+
+
+while True:
+    try:
+        bot.polling(non_stop=True)
+    except Exception as e:
+        print(e)
+
+# bot.infinity_polling()
