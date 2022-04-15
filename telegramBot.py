@@ -4,6 +4,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 TOKEN = getEnv('TOKEN')
 ALLOWED_USERS = getEnv('ALLOWED_USERS', cast=int, isList=True)
+ADMIN = getEnv('ADMIN')
 
 bot = TeleBot(TOKEN, parse_mode='HTML')
 audioRecorder = AudioRecorder()
@@ -45,6 +46,7 @@ remind = Reminder()
 def isNotAuthorised(userID):
     if userID not in ALLOWED_USERS:
         bot.send_message(userID, "You are not authorized to use this bot")
+        bot.send_message(ADMIN,f'Incoming request from unregistered user {userID}')
         return True
     return False
 
@@ -226,13 +228,13 @@ def crashTheCode():
     import os 
     os._exit(1)
 
-Timer(12*3600,crashTheCode).start() # crash after 12 hours
+# Timer(12*3600,crashTheCode).start() # crash after 12 hours
 
 
-while True:
-    try:
-        bot.polling(non_stop=True)
-    except Exception as e:
-        print(e)
+# while True:
+#     try:
+#         bot.polling(non_stop=True)
+#     except Exception as e:
+#         print(e)
 
-# bot.infinity_polling()
+bot.infinity_polling()
