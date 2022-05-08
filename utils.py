@@ -1,4 +1,5 @@
 # https://www.lfd.uci.edu/~gohlke/pythonlibs/#pyaudio
+import chunk
 import os
 import cv2
 import wave
@@ -30,6 +31,7 @@ def getFileName(name: str, ext: str) -> str:
 
 def getEnv(var, cast=None, isList=False):
     value = os.getenv(var)
+    print(var,value)
     if isList:
         value = [cast(i) if cast else i for i in value.split()]
     if cast and not isList:
@@ -195,7 +197,8 @@ class VideoRecorder():
             thisFPS = self.framescount / totalTime
             fileName = getFileName('Video', 'mp4')
             reFFMPEG(self.tempFile, thisFPS, fileName, self.fps)
-            return fileName
+            acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
+            return fileName,acT
 
 
 def reFFMPEG(iFile, ifFPS, oFile, oFPS):
@@ -218,6 +221,38 @@ def mergeFFMPEG(videoStream, audioStream, videoOut):
     os.remove(audioStream)
 
 
+
+def markedFileName(mark):
+    fName = getFileName('Video', 'mp4')
+    pth,fNme = os.path.split(fName)
+    b,e = os.path.splitext(fNme)
+    return os.path.join(pth,b+f'_{mark}'+e)
+
+
+def splitVideos(inFile, actTime, chunks=300):
+    # split in chunks of 5 minutes
+    if actTime<=chunks:
+        print('Nothing to split, video is already small')
+        return [inFile]
+    files = []
+    nChnks = int(actTime/chunks)
+    for i in range(nChnks+1):
+        sTime, eTime = i*chunks, (i+1)*chunks
+        if eTime> actTime : 
+            eTime = actTime
+        # print(sTime,eTime,actTime)
+        fName = markedFileName(i+1)
+        subprocess.call(
+            f"ffmpeg -i {inFile} -ss {sTime} -t {eTime} {fName} >> ffmpeg.log 2>&1",
+        shell=True)
+        files.append(fName)
+    return files
+
+
+
+
+
+
 # def mergeMoviePy(videoStream, audioStream, videoOut, fps=15):
 #     my_clip = mpe.VideoFileClip(videoStream)
 #     audio_background = mpe.AudioFileClip(audioStream)
@@ -229,15 +264,16 @@ def mergeFFMPEG(videoStream, audioStream, videoOut):
 
 if __name__ == '__main__':
     # # # os.remove('./output_new.wav')
-    ra = AudioRecorder()
+    # ra = AudioRecorder()
     rv = VideoRecorder()
 
-    ra.start()
+    # ra.start()
     rv.start()
-    sleep(1)
-    audFile = ra.finish()
-    vidFile = rv.finish()
+    sleep(25)
+    # audFile = ra.finish()
+    vidFile,act = rv.finish()
+    splitVideos(vidFile,act,10)
 
-    file = getFileName('Video', 'mp4')
-    print(audFile, vidFile, file)
-    mergeFFMPEG(vidFile, audFile, file)
+    # file = getFileName('Video', 'mp4')
+    # print(audFile, vidFile, file)
+    # mergeFFMPEG(vidFile, audFile, file)

@@ -9,7 +9,7 @@ ADMIN = getEnv('ADMIN')
 bot = TeleBot(TOKEN, parse_mode='HTML')
 audioRecorder = AudioRecorder()
 videoRecorder = VideoRecorder()
-
+chunkSize = 10 # 5 minute chunks
 
 # remind the user when a long recording in progress
 class Reminder:
@@ -177,16 +177,20 @@ def callback_query(call):
             return
         message = bot.send_message(user, "Processing please wait")
 
-        file = videoRecorder.finish()
+        fileOrg,act = videoRecorder.finish()
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         message = bot.send_message(user, "Wait while the bot uploads the video")
 
+        files = splitVideos(fileOrg, act, chunkSize)
+
         try:
-            with open(file, 'rb') as f:
-                bot.send_video(user, f)
+            for file in files:
+                with open(file, 'rb') as f:
+                    bot.send_video(user, f)
         except:
-            bot.send_message(user, f"Something went wrong while uploading the video file. You can find the video stored as {file}")
+            bot.send_message(user, 
+            f"Something went wrong while uploading the video file.You can find the video stored as {fileOrg}")
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_videoonly":
@@ -201,18 +205,24 @@ def callback_query(call):
         message = bot.send_message(user, "Processing please wait")
 
         audFile = audioRecorder.finish()
-        vidFile = videoRecorder.finish()
+        vidFile, act = videoRecorder.finish()
 
-        file = getFileName('Video', 'mp4')
-        mergeFFMPEG(vidFile, audFile, file)
+        fileOrg = getFileName('Video', 'mp4')
+        mergeFFMPEG(vidFile, audFile, fileOrg)
+
+        files = splitVideos(fileOrg, act, chunkSize)
+        print(files)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
-        message = bot.send_message(user, "Wait while the bot uploads the video")
+        message = bot.send_message(user, "Wait while the bot uploads the video"
+         "The Video will be split due to Telegram restrictions." if len(files)>1 else "")
         try:
-            with open(file, 'rb') as f:
-                bot.send_video(user, f)
+            for file in files:
+                with open(file, 'rb') as f:
+                    bot.send_video(user, f)
         except:
-            bot.send_message(user, f"Something went wrong while uploading the video file. You can find the video stored as {file}")
+            bot.send_message(user, 
+            f"Something went wrong while uploading the video file. You can find the video stored as {fileOrg}")
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_video":
@@ -226,7 +236,7 @@ def callback_query(call):
 
 def crashTheCode():
     import os 
-    os._exit(1)
+    os._exit(1)  # exit all threads
 
 # Timer(12*3600,crashTheCode).start() # crash after 12 hours
 
@@ -236,5 +246,5 @@ def crashTheCode():
 #         bot.polling(non_stop=True)
 #     except Exception as e:
 #         print(e)
-
+bot.send_message(ADMIN, "Starting bot")
 bot.infinity_polling()
