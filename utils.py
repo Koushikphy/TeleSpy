@@ -31,7 +31,7 @@ def getFileName(name: str, ext: str) -> str:
 
 def getEnv(var, cast=None, isList=False):
     value = os.getenv(var)
-    print(var,value)
+    # print(var,value)
     if isList:
         value = [cast(i) if cast else i for i in value.split()]
     if cast and not isList:

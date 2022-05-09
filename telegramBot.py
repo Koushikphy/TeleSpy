@@ -211,11 +211,11 @@ def callback_query(call):
         mergeFFMPEG(vidFile, audFile, fileOrg)
 
         files = splitVideos(fileOrg, act, chunkSize)
-        print(files)
+        # print(files)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
-        message = bot.send_message(user, "Wait while the bot uploads the video"
-         "The Video will be split due to Telegram restrictions." if len(files)>1 else "")
+        nTxt = "The Video will be split due to Telegram restrictions." if len(files)>1 else ""
+        message = bot.send_message(user, "Wait while the bot uploads the video. " + nTxt)
         try:
             for file in files:
                 with open(file, 'rb') as f:
