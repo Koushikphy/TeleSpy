@@ -125,8 +125,8 @@ class VideoRecorder():
     # NOTE: openCV doesn't capture/write video stream in a constant fps, its increases/decreases depending on
     # several parameter, but the videowriter doesn't get the information from the capturer and saves the file in
     # a constant fps stream, this makes the video slower/faster than the actual real time stream.
-    # There are several non-cv method to fix this. Here the video stream is written in the constant fps and the actual
-    # real world clock time is measured for the whole duration, which gives us the effective fps for the stream
+    # There are several non-cv method to fix this. Here the video stream is written in the actual fps provided by the webcam
+    #  and the actual real world clock time is measured for the whole duration, which gives us the effective fps for the stream
     # then the fps of the video is fixed using `ffmpeg`
 
     def __init__(self, fps=15):
@@ -196,8 +196,8 @@ class VideoRecorder():
             totalTime = self.closeCapture()
             thisFPS = self.framescount / totalTime
             fileName = getFileName('Video', 'mp4')
-            reFFMPEG(self.tempFile, thisFPS, fileName, self.fps)
             acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
+            reFFMPEG(self.tempFile, thisFPS, fileName, self.fps)
             return fileName,acT
 
 
@@ -243,7 +243,7 @@ def splitVideos(inFile, actTime, chunks=300):
         # print(sTime,eTime,actTime)
         fName = markedFileName(i+1)
         subprocess.call(
-            f"ffmpeg -i {inFile} -ss {sTime} -t {eTime} {fName} >> ffmpeg.log 2>&1",
+            f"ffmpeg -i {inFile} -ss {sTime} -to {eTime} {fName} >> ffmpeg.log 2>&1",
         shell=True)
         files.append(fName)
     return files

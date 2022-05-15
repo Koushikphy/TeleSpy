@@ -9,7 +9,7 @@ ADMIN = getEnv('ADMIN')
 bot = TeleBot(TOKEN, parse_mode='HTML')
 audioRecorder = AudioRecorder()
 videoRecorder = VideoRecorder()
-chunkSize = 10 # 5 minute chunks
+chunkSize = 300 # chunks in second
 
 # remind the user when a long recording in progress
 class Reminder:
@@ -191,6 +191,8 @@ def callback_query(call):
         except:
             bot.send_message(user, 
             f"Something went wrong while uploading the video file.You can find the video stored as {fileOrg}")
+        finally:
+            removeFile(*files)
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_videoonly":
@@ -211,7 +213,6 @@ def callback_query(call):
         mergeFFMPEG(vidFile, audFile, fileOrg)
 
         files = splitVideos(fileOrg, act, chunkSize)
-        # print(files)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         nTxt = "The Video will be split due to Telegram restrictions." if len(files)>1 else ""
@@ -223,6 +224,8 @@ def callback_query(call):
         except:
             bot.send_message(user, 
             f"Something went wrong while uploading the video file. You can find the video stored as {fileOrg}")
+        finally:
+            removeFile(*files)
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_video":
