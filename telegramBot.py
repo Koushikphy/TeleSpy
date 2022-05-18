@@ -184,7 +184,7 @@ def callback_query(call):
             return
         message = bot.send_message(user, "Processing please wait")
 
-        fileOrg,act = videoRecorder.finish()
+        fileOrg, act = videoRecorder.finish()
         files = splitVideos(fileOrg, act, chunkSize)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
@@ -213,7 +213,7 @@ def callback_query(call):
             return
         message = bot.send_message(user, "Processing please wait")
 
-        audFile, = audioRecorder.finish()
+        audFile, act = audioRecorder.finish()
         vidFile, act = videoRecorder.finish()
 
         fileOrg = getFileName('Video', 'mp4')
