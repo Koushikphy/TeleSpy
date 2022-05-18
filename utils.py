@@ -116,8 +116,9 @@ class AudioRecorder:
             wf.setsampwidth(self.port.get_sample_size(self.sample_format))
             wf.setframerate(self.fs)
             wf.writeframes(b''.join(self.frames))
+            duration = wf.getnframes()/wf.getframerate() # -or- len(self.frames)*self.chunk/self.fs
             wf.close()
-            return file
+            return file, duration
 
 
 class VideoRecorder():
@@ -222,8 +223,8 @@ def mergeFFMPEG(videoStream, audioStream, videoOut):
 
 
 
-def markedFileName(mark):
-    fName = getFileName('Video', 'mp4')
+def markedFileName(fName,mark):
+    # fName = getFileName('Video', 'mp4')
     pth,fNme = os.path.split(fName)
     b,e = os.path.splitext(fNme)
     return os.path.join(pth,b+f'_{mark}'+e)
@@ -232,7 +233,7 @@ def markedFileName(mark):
 def splitVideos(inFile, actTime, chunks=300):
     # split in chunks of 5 minutes
     if actTime<=chunks:
-        print('Nothing to split, video is already small')
+        print('Nothing to split, file is already small')
         return [inFile]
     files = []
     nChnks = int(actTime/chunks)
@@ -241,12 +242,13 @@ def splitVideos(inFile, actTime, chunks=300):
         if eTime> actTime : 
             eTime = actTime
         # print(sTime,eTime,actTime)
-        fName = markedFileName(i+1)
+        fName = markedFileName(inFile,i+1)
         subprocess.call(
             f"ffmpeg -i {inFile} -ss {sTime} -to {eTime} {fName} >> ffmpeg.log 2>&1",
         shell=True)
         files.append(fName)
     return files
+
 
 
 

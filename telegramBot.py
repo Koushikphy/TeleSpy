@@ -9,7 +9,7 @@ ADMIN = getEnv('ADMIN')
 bot = TeleBot(TOKEN, parse_mode='HTML')
 audioRecorder = AudioRecorder()
 videoRecorder = VideoRecorder()
-chunkSize = 300 # chunks in second
+chunkSize = 5 # chunks in second
 
 # remind the user when a long recording in progress
 class Reminder:
@@ -154,15 +154,22 @@ def callback_query(call):
             return
         message = bot.send_message(user, "Processing please wait")
 
-        file = audioRecorder.finish()
+        fileOrg, acT = audioRecorder.finish()
+        files = splitVideos(fileOrg, acT, chunkSize)
+
+
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
-        message = bot.send_message(user, "Wait while the bot uploads the audio")
+        nTxt = "The Audio will be split due to Telegram restrictions." if len(files)>1 else ""
+        message = bot.send_message(user, "Wait while the bot uploads the audio. "+nTxt)
 
         try:
-            with open(file, 'rb') as f:
-                bot.send_audio(user, f)
+            for file in files:
+                with open(fileOrg, 'rb') as f:
+                    bot.send_audio(user, f)
         except:
-            bot.send_message(user, f"Something went wrong while uploading the audio file. You can find the audio stored as {file}")
+            bot.send_message(user, f"Something went wrong while uploading the audio file. You can find the audio stored as {fileOrg}")
+        finally:
+            removeFile(*files)
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_audio":
@@ -178,11 +185,11 @@ def callback_query(call):
         message = bot.send_message(user, "Processing please wait")
 
         fileOrg,act = videoRecorder.finish()
+        files = splitVideos(fileOrg, act, chunkSize)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
-        message = bot.send_message(user, "Wait while the bot uploads the video")
-
-        files = splitVideos(fileOrg, act, chunkSize)
+        nTxt = "The video will be split due to Telegram restrictions." if len(files)>1 else ""
+        message = bot.send_message(user, "Wait while the bot uploads the video. " + nTxt)
 
         try:
             for file in files:
@@ -206,7 +213,7 @@ def callback_query(call):
             return
         message = bot.send_message(user, "Processing please wait")
 
-        audFile = audioRecorder.finish()
+        audFile, = audioRecorder.finish()
         vidFile, act = videoRecorder.finish()
 
         fileOrg = getFileName('Video', 'mp4')
@@ -215,7 +222,7 @@ def callback_query(call):
         files = splitVideos(fileOrg, act, chunkSize)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
-        nTxt = "The Video will be split due to Telegram restrictions." if len(files)>1 else ""
+        nTxt = "The video will be split due to Telegram restrictions." if len(files)>1 else ""
         message = bot.send_message(user, "Wait while the bot uploads the video. " + nTxt)
         try:
             for file in files:
