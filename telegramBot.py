@@ -60,7 +60,17 @@ def send_welcome(message):
 
 
 @bot.message_handler(commands='photo')
-def send_screenshot(message):
+def send_photo(message):
+    takePhoto(message,toDelete=True)
+
+
+@bot.message_handler(commands='photo_keep')
+def send_photo2(message):
+    takePhoto(message)
+
+
+
+def takePhoto(message, toDelete=False):
     user = message.from_user.id
     if isNotAuthorised(message.from_user):
         return
@@ -69,11 +79,18 @@ def send_screenshot(message):
         bot.send_message(user, "Video recording is in progress. Can't capture photo.")
         return
 
-    message = bot.send_message(message.from_user.id, "Wait while the bot takes the photo")
+    waitM = bot.send_message(user, "Wait while the bot takes the photo")
     file = takeScreenShot()
     with open(file, 'rb') as f:
-        bot.send_photo(user, f)
-    bot.delete_message(message.chat.id, message.message_id)
+        photoM = bot.send_photo(user, f, caption= "This photo will be deleted after 5 seconds." if toDelete else None)
+    bot.delete_message(waitM.chat.id, waitM.message_id)
+
+    if toDelete: # wait for 5 sectond and delete
+        Timer(5, lambda : (bot.delete_message(photoM.chat.id, photoM.message_id), 
+                        bot.delete_message(message.chat.id, message.message_id))
+            ).start()
+
+
 
 
 @bot.message_handler(commands='audio')
