@@ -194,32 +194,43 @@ class VideoRecorder():
 
     def finish(self):
         if self.isRunning():
+            fileName = getFileName('Videoo', 'mp4')
             totalTime = self.closeCapture()
             thisFPS = self.framescount / totalTime
-            fileName = getFileName('Video', 'mp4')
             acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
             reFFMPEG(self.tempFile, thisFPS, fileName, self.fps)
-            return fileName,acT
+            return fileName, acT
 
 
-def reFFMPEG(iFile, ifFPS, oFile, oFPS):
+def reFFMPEG(iFile, iFPS, oFile, oFPS):
     # change fps of the video file, writes output to `ffmpeg.log`
-    subprocess.call(f"ffmpeg -y -r {ifFPS} -i {iFile} -r {oFPS} {oFile} >> ffmpeg.log 2>&1", shell=True)
-    os.remove(iFile) # remove the temporary file
-
-
-# def reMoviePy(iFile, oFile, fps=15):
-#     my_clip = mpe.VideoFileClip(iFile)
-#     my_clip.write_videofile(oFile,fps)
+    ret = subprocess.call(f"ffmpeg -y -r {iFPS} -i {iFile} -r {oFPS} {oFile} >> ffmpeg.log 2>&1", shell=True)
+    if ret==0:
+        os.remove(iFile) # remove the temporary file
 
 
 def mergeFFMPEG(videoStream, audioStream, videoOut):
     # merge audio and video stream, writes output to `ffmpeg.log`
-    subprocess.call(
-        f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} {videoOut} >> ffmpeg.log 2>&1",
+    ret = subprocess.call( f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} \
+                -vcodec libx265 -crf 24 {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
-    os.remove(videoStream)
-    os.remove(audioStream)
+    if ret==0:
+        os.remove(videoStream)
+        os.remove(audioStream)
+
+
+def wavTo_m4a(inFile):
+    file = getFileName("Audio",'m4a')
+    ret= subprocess.call(f"ffmpeg -i {inFile} {file} >> ffmpeg.log 2>&1", shell=True)
+    if ret==0:
+        return file
+
+
+# def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut):
+#     subprocess.call(
+#         f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} -r {oFPS} -i {audioStream}  {videoOut} >> ffmpeg.log 2>&1",
+#         shell=True)
+
 
 
 
@@ -230,7 +241,7 @@ def markedFileName(fName,mark):
     return os.path.join(pth,b+f'_{mark}'+e)
 
 
-def splitVideos(inFile, actTime, chunks=300):
+def splitFilesInChunks(inFile, actTime, chunks=300):
     # split in chunks of 5 minutes
     if actTime<=chunks:
         print('Nothing to split, file is already small')
@@ -266,16 +277,34 @@ def splitVideos(inFile, actTime, chunks=300):
 
 if __name__ == '__main__':
     # # # os.remove('./output_new.wav')
-    # ra = AudioRecorder()
+    ra = AudioRecorder()
     rv = VideoRecorder()
 
-    # ra.start()
+    ra.start()
     rv.start()
-    sleep(25)
-    # audFile = ra.finish()
-    vidFile,act = rv.finish()
-    splitVideos(vidFile,act,10)
 
-    # file = getFileName('Video', 'mp4')
+    sleep(600)
+
+    s = time()
+    audFile, _ = ra.finish()
+    vidFile, _ = rv.finish()
+
+
+    file = wavTo_m4a(audFile)
+    print(f"Time took: {time()-s}")
+
+
+    file = getFileName('Video', 'mp4')
+    mergeFFMPEG(vidFile, audFile, file)
+
+
+    print(f"Time took: {time()-s}")
+
+
+
     # print(audFile, vidFile, file)
-    # mergeFFMPEG(vidFile, audFile, file)
+
+
+#NOTES:
+# 1. re FPS and merging does not work properly in a single command so opt for dual step
+# 2. with 265 crf 381/555 and without 787/1010

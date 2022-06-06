@@ -9,7 +9,7 @@ ADMIN = getEnv('ADMIN')
 bot = TeleBot(TOKEN, parse_mode='HTML')
 audioRecorder = AudioRecorder()
 videoRecorder = VideoRecorder()
-chunkSize = 5 # chunks in second
+chunkSize = 600 # chunks in second
 
 # remind the user when a long recording in progress
 class Reminder:
@@ -171,9 +171,9 @@ def callback_query(call):
             return
         message = bot.send_message(user, "Processing please wait")
 
-        fileOrg, acT = audioRecorder.finish()
-        files = splitVideos(fileOrg, acT, chunkSize)
-
+        fileOrgWAV, acT = audioRecorder.finish()
+        fileOrg = wavTo_m4a(fileOrgWAV)
+        files = splitFilesInChunks(fileOrg, acT, chunkSize)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         nTxt = "The Audio will be split due to Telegram restrictions." if len(files)>1 else ""
@@ -181,12 +181,12 @@ def callback_query(call):
 
         try:
             for file in files:
-                with open(fileOrg, 'rb') as f:
+                with open(file, 'rb') as f:
                     bot.send_audio(user, f)
         except:
             bot.send_message(user, f"Something went wrong while uploading the audio file. You can find the audio stored as {fileOrg}")
         finally:
-            removeFile(*files)
+            if len(files)!=1: removeFile(*files)
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_audio":
@@ -202,7 +202,7 @@ def callback_query(call):
         message = bot.send_message(user, "Processing please wait")
 
         fileOrg, act = videoRecorder.finish()
-        files = splitVideos(fileOrg, act, chunkSize)
+        files = splitFilesInChunks(fileOrg, act, chunkSize)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         nTxt = "The video will be split due to Telegram restrictions." if len(files)>1 else ""
@@ -216,7 +216,7 @@ def callback_query(call):
             bot.send_message(user, 
             f"Something went wrong while uploading the video file.You can find the video stored as {fileOrg}")
         finally:
-            removeFile(*files)
+            if len(files)!=1: removeFile(*files)
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_videoonly":
@@ -236,7 +236,7 @@ def callback_query(call):
         fileOrg = getFileName('Video', 'mp4')
         mergeFFMPEG(vidFile, audFile, fileOrg)
 
-        files = splitVideos(fileOrg, act, chunkSize)
+        files = splitFilesInChunks(fileOrg, act, chunkSize)
 
         bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
         nTxt = "The video will be split due to Telegram restrictions." if len(files)>1 else ""
@@ -249,7 +249,7 @@ def callback_query(call):
             bot.send_message(user, 
             f"Something went wrong while uploading the video file. You can find the video stored as {fileOrg}")
         finally:
-            removeFile(*files)
+            if len(files)!=1: removeFile(*files)
         bot.delete_message(message.chat.id, message.message_id)
 
     elif call.data == "cb_cancel_video":
