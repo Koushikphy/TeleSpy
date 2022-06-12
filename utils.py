@@ -212,7 +212,7 @@ def reFFMPEG(iFile, iFPS, oFile, oFPS):
 def mergeFFMPEG(videoStream, audioStream, videoOut):
     # merge audio and video stream, writes output to `ffmpeg.log`
     ret = subprocess.call( f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} \
-                -vcodec libx265 -crf 24 {videoOut} >> ffmpeg.log 2>&1",
+                -vcodec libx265 -crf 21 {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
     if ret==0:
         os.remove(videoStream)
@@ -226,10 +226,10 @@ def wavTo_m4a(inFile):
         return file
 
 
-# def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut):
-#     subprocess.call(
-#         f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} -r {oFPS} -i {audioStream}  {videoOut} >> ffmpeg.log 2>&1",
-#         shell=True)
+def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut):
+    subprocess.call(
+        f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} -r {oFPS} -i {audioStream} -vcodec libx265 -crf 21 {videoOut} >> ffmpeg.log 2>&1",
+        shell=True)
 
 
 
@@ -243,8 +243,9 @@ def markedFileName(fName,mark):
 
 def splitFilesInChunks(inFile, actTime, chunks=300):
     # split in chunks of 5 minutes
+    fileSize = os.path.getsize(inFile)/10e6  # filesiz in mb
     if actTime<=chunks:
-        print('Nothing to split, file is already small')
+        print(f'Nothing to split, file is already small. Filesize: {fileSize} MB')
         return [inFile]
     files = []
     nChnks = int(actTime/chunks)
