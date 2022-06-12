@@ -40,6 +40,7 @@ def getEnv(var, cast=None, isList=False):
 
 
 def removeFile(*fileList):
+    # return
     for file in fileList:
         if (os.path.exists(file)):
             os.remove(file)
@@ -209,10 +210,10 @@ def reFFMPEG(iFile, iFPS, oFile, oFPS):
         os.remove(iFile) # remove the temporary file
 
 
-def mergeFFMPEG(videoStream, audioStream, videoOut):
+def mergeFFMPEG(videoStream, audioStream, videoOut, crf=24):
     # merge audio and video stream, writes output to `ffmpeg.log`
     ret = subprocess.call( f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} \
-                -vcodec libx265 -crf 21 {videoOut} >> ffmpeg.log 2>&1",
+                -vcodec libx265 -crf {crf} {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
     if ret==0:
         os.remove(videoStream)
@@ -226,10 +227,12 @@ def wavTo_m4a(inFile):
         return file
 
 
-def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut):
-    subprocess.call(
-        f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} -r {oFPS} -i {audioStream} -vcodec libx265 -crf 21 {videoOut} >> ffmpeg.log 2>&1",
+def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut,crf=24):
+    ret = subprocess.call(
+        f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} -r {oFPS} -i {audioStream} -vcodec libx265 -crf {crf} {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
+    if ret==0:
+        removeFile(videoStream, audioStream)
 
 
 
@@ -309,3 +312,7 @@ if __name__ == '__main__':
 #NOTES:
 # 1. re FPS and merging does not work properly in a single command so opt for dual step
 # 2. with 265 crf 381/555 and without 787/1010
+
+# TODO
+# 1. Video recorder finishWithAudio and normal finish
+# 2. all send try split block can be summed up in one function

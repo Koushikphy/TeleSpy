@@ -175,7 +175,6 @@ def videoMarkup():
 def callback_query(call):
     remind.cancel()  # clear all reminder
     user = call.from_user.id
-    # bot.edit_message_reply_markup(message_id=call.message.id, chat_id=call.message.chat.id, reply_markup=None)
     deleteMessage(call.message)
     if call.data == "cb_stop_audio":
         if not audioRecorder.isRunning():
@@ -199,13 +198,12 @@ def callback_query(call):
             bot.send_message(user, f"Something went wrong while uploading the audio file. You can find the audio stored as {fileOrg}")
         finally:
             if len(files)!=1: removeFile(*files)
-        # bot.delete_message(message.chat.id, message.message_id)
         deleteMessage(message)
 
     elif call.data == "cb_cancel_audio":
         audioRecorder.terminate()
         message = bot.send_message(user, "Recording terminated")
-        deleteMessage(message,3)
+        deleteMessage(message,5)
 
     #------------------------------------------------------------------------
 
@@ -228,16 +226,15 @@ def callback_query(call):
                     bot.send_video(user, f)
         except:
             bot.send_message(user, 
-            f"Something went wrong while uploading the video file.You can find the video stored as {fileOrg}")
+            f"Something went wrong while uploading the video file. You can find the video stored as {fileOrg}")
         finally:
             if len(files)!=1: removeFile(*files)
-        # bot.delete_message(message.chat.id, message.message_id)
         deleteMessage(message)
 
     elif call.data == "cb_cancel_videoonly":
         videoRecorder.terminate()
         message = bot.send_message(user, "Recording terminated")
-        deleteMessage(message)
+        deleteMessage(message,5)
 
     #-----------------------------------------------------------------
     elif call.data == "cb_stop_video":
@@ -246,7 +243,7 @@ def callback_query(call):
             return
         message = bot.send_message(user, "Processing please wait")
 
-        audFile, act = audioRecorder.finish()
+        audFile, _ = audioRecorder.finish()
         vidFile, act = videoRecorder.finish()
 
         fileOrg = getFileName('Video', 'mp4')
@@ -266,7 +263,6 @@ def callback_query(call):
             f"Something went wrong while uploading the video file. You can find the video stored as {fileOrg}")
         finally:
             if len(files)!=1: removeFile(*files)
-        # bot.delete_message(message.chat.id, message.message_id)
         deleteMessage(message)
 
     elif call.data == "cb_cancel_video":
@@ -274,7 +270,7 @@ def callback_query(call):
         videoRecorder.terminate()
         audioRecorder.terminate()
         message = bot.send_message(user, "Recording terminated")
-        deleteMessage(message)
+        deleteMessage(message,5)
 
 
 

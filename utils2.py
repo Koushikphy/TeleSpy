@@ -40,7 +40,7 @@ def getEnv(var, cast=None, isList=False):
 
 
 def removeFile(*fileList):
-    return
+    # return
     for file in fileList:
         if (os.path.exists(file)):
             os.remove(file)
@@ -211,10 +211,10 @@ def reFFMPEG(iFile, iFPS, oFile, oFPS):
         removeFile(iFile)
 
 
-def mergeFFMPEG(videoStream, audioStream, videoOut):
+def mergeFFMPEG(videoStream, audioStream, videoOut, crf=24):
     # merge audio and video stream, writes output to `ffmpeg.log`
     ret = subprocess.call( f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} \
-                -vcodec libx265 -crf 21 {videoOut} >> ffmpeg.log 2>&1",
+                -vcodec libx265 -crf {crf} {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
     if ret==0:
         removeFile(videoStream, audioStream)
@@ -227,10 +227,12 @@ def wavTo_m4a(inFile):
         return file
 
 
-def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut):
-    subprocess.call(
-        f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} -r {oFPS} -i {audioStream} -vcodec libx265 -crf 21  {videoOut} >> ffmpeg.log 2>&1",
+def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut,crf = 24):
+    ret = subprocess.call(
+        f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} -r {oFPS} -i {audioStream} -vcodec libx265 -crf {crf} {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
+    if ret==0:
+        removeFile(videoStream, audioStream)
 
 
 
@@ -270,7 +272,7 @@ if __name__ == '__main__':
     ra.start()
     rv.start()
 
-    sleep(120)
+    sleep(600)
 
     audFile, _ = ra.finish()
     vidFile, _, tFPS, iFPS = rv.finish()
@@ -278,7 +280,7 @@ if __name__ == '__main__':
     s = time()
 
     # one step process
-    reMergeFFMPEG(vidFile,audFile,tFPS, iFPS, '1step.mp4')
+    reMergeFFMPEG(vidFile,audFile,tFPS, iFPS, '1step_24.mp4')
 
     print(f"Time took: {time()-s}")
 
@@ -286,7 +288,22 @@ if __name__ == '__main__':
 
     # two step process
     reFFMPEG(vidFile, tFPS, 'tmp.mp4', iFPS)
-    mergeFFMPEG('tmp.mp4', audFile, '2step.mp4')
+    mergeFFMPEG('tmp.mp4', audFile, '2step_24.mp4')
+
+    print(f"Time took: {time()-s}")
+
+    s = time()
+
+    # one step process
+    reMergeFFMPEG(vidFile,audFile,tFPS, iFPS, '1step_21.mp4',21)
+
+    print(f"Time took: {time()-s}")
+
+    s = time()
+
+    # two step process
+    reFFMPEG(vidFile, tFPS, 'tmpt.mp4', iFPS)
+    mergeFFMPEG('tmp.mp4', audFile, '2step_21.mp4',21)
 
     print(f"Time took: {time()-s}")
 
