@@ -15,11 +15,10 @@ chunkSize = 600 # chunks in second
 class Reminder:
 
     def __init__(self, timeOut=10 * 60):
-        self.timeOut = timeOut  # interval to notify the user
+        self.timeOut = timeOut  # interval to notify the user, 10 minute default
         self.timer: Timer
         self.userid: int = 0
-        self.lastChatID: int = 0
-        self.lastMsgID: int = 0
+
 
     def remind(self, userid: int):
         self.userid = userid
@@ -27,16 +26,10 @@ class Reminder:
         self.timer.start()
 
     def nudge(self):
-        if self.lastChatID:
-            bot.delete_message(self.lastChatID, self.lastMsgID)
         message = bot.send_message(self.userid, "Recording in progress. Don't forget to finish")
-        self.lastChatID = message.chat.id
-        self.lastMsgID = message.message_id
+        deleteMessage(message,10) # delete this notification after 10 seconds
 
     def cancel(self):
-        self.userid = 0
-        self.lastChatID = 0
-        self.lastMsgID = 0
         self.timer.cancel()
 
 
@@ -97,9 +90,7 @@ def takePhoto(message, toDelete=False):
     if toDelete: # wait for 5 sectond and delete
         deleteMessage(photoM,5)
         deleteMessage(message,5)
-        # Timer(5, lambda : (bot.delete_message(photoM.chat.id, photoM.message_id), 
-                        # bot.delete_message(message.chat.id, message.message_id))
-            # ).start()
+
 
 
 
@@ -180,24 +171,10 @@ def callback_query(call):
         if not audioRecorder.isRunning():
             bot.send_message(user, "No recording is currently in progress !!!")
             return
+    
         message = bot.send_message(user, "Processing please wait")
-
-        fileOrgWAV, acT = audioRecorder.finish()
-        fileOrg = wavTo_m4a(fileOrgWAV)
-        files = splitFilesInChunks(fileOrg, acT, chunkSize)
-
-        bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
-        nTxt = "The Audio will be split due to Telegram restrictions." if len(files)>1 else ""
-        message = bot.send_message(user, "Wait while the bot uploads the audio. "+nTxt)
-
-        try:
-            for file in files:
-                with open(file, 'rb') as f:
-                    bot.send_audio(user, f)
-        except:
-            bot.send_message(user, f"Something went wrong while uploading the audio file. You can find the audio stored as {fileOrg}")
-        finally:
-            if len(files)!=1: removeFile(*files)
+        fileOrg, act = audioRecorder.finish(toM4A=True)
+        processAndUpload(user, fileOrg, act)
         deleteMessage(message)
 
     elif call.data == "cb_cancel_audio":
@@ -211,24 +188,10 @@ def callback_query(call):
         if not videoRecorder.isRunning():
             bot.send_message(user, "No recording is currently in progress !!!")
             return
+
         message = bot.send_message(user, "Processing please wait")
-
         fileOrg, act = videoRecorder.finish()
-        files = splitFilesInChunks(fileOrg, act, chunkSize)
-
-        bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
-        nTxt = "The video will be split due to Telegram restrictions." if len(files)>1 else ""
-        message = bot.send_message(user, "Wait while the bot uploads the video. " + nTxt)
-
-        try:
-            for file in files:
-                with open(file, 'rb') as f:
-                    bot.send_video(user, f)
-        except:
-            bot.send_message(user, 
-            f"Something went wrong while uploading the video file. You can find the video stored as {fileOrg}")
-        finally:
-            if len(files)!=1: removeFile(*files)
+        processAndUpload(user, fileOrg, act)
         deleteMessage(message)
 
     elif call.data == "cb_cancel_videoonly":
@@ -241,28 +204,11 @@ def callback_query(call):
         if not audioRecorder.isRunning() or not videoRecorder.isRunning():
             bot.send_message(user, "No recording is currently in progress !!!")
             return
+
         message = bot.send_message(user, "Processing please wait")
-
         audFile, _ = audioRecorder.finish()
-        vidFile, act = videoRecorder.finish()
-
-        fileOrg = getFileName('Video', 'mp4')
-        mergeFFMPEG(vidFile, audFile, fileOrg)
-
-        files = splitFilesInChunks(fileOrg, act, chunkSize)
-
-        bot.edit_message_text("Recording saved successfully", message.chat.id, message.message_id)
-        nTxt = "The video will be split due to Telegram restrictions." if len(files)>1 else ""
-        message = bot.send_message(user, "Wait while the bot uploads the video. " + nTxt)
-        try:
-            for file in files:
-                with open(file, 'rb') as f:
-                    bot.send_video(user, f)
-        except:
-            bot.send_message(user, 
-            f"Something went wrong while uploading the video file. You can find the video stored as {fileOrg}")
-        finally:
-            if len(files)!=1: removeFile(*files)
+        fileOrg, act = videoRecorder.finishWithAudio(audFile)
+        processAndUpload(user, fileOrg, act)
         deleteMessage(message)
 
     elif call.data == "cb_cancel_video":
@@ -275,17 +221,37 @@ def callback_query(call):
 
 
 
+
+def processAndUpload(user, file, act):
+
+    files = splitFilesInChunks(file, act, chunkSize)
+
+    nTxt = "The file will be split due to Telegram restrictions." if len(files)>1 else ""
+    message = bot.send_message(user, "Recording saved successfully. Wait while the bot uploads the file. " + nTxt)
+    try:
+        for file in files:
+            with open(file, 'rb') as f:
+                if file.endswith('mp4'):
+                    bot.send_video(user, f)
+                else:
+                    bot.send_audio(user, f)
+    except:
+        bot.send_message(user, 
+        f"Something went wrong while uploading the file file. You can find the file stored as {file}")
+    finally:
+        if len(files)!=1: 
+            removeFile(*files)
+    deleteMessage(message)
+
+
+
+
+
+
 def crashTheCode():
     import os 
     os._exit(1)  # exit all threads
 
-# Timer(12*3600,crashTheCode).start() # crash after 12 hours
 
-
-# while True:
-#     try:
-#         bot.polling(non_stop=True)
-#     except Exception as e:
-#         print(e)
 bot.send_message(ADMIN, "Starting bot")
 bot.infinity_polling()

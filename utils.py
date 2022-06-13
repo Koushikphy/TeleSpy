@@ -108,7 +108,7 @@ class AudioRecorder:
         if self.isRunning():
             self.closeCapture()
 
-    def finish(self):
+    def finish(self,toM4A=False):
         if self.isRunning():
             self.closeCapture()
             file = getFileName('Audio', 'wav')
@@ -119,6 +119,10 @@ class AudioRecorder:
             wf.writeframes(b''.join(self.frames))
             duration = wf.getnframes()/wf.getframerate() # -or- len(self.frames)*self.chunk/self.fs
             wf.close()
+            if toM4A:
+                tFile = file
+                file = getFileName("Audio",'m4a')
+                wavTo_m4a(tFile,file)
             return file, duration
 
 
@@ -194,6 +198,7 @@ class VideoRecorder():
             self.closeCapture()
 
     def finish(self):
+        # fixes the fps and returns a mp4 file
         if self.isRunning():
             fileName = getFileName('Videoo', 'mp4')
             totalTime = self.closeCapture()
@@ -201,6 +206,18 @@ class VideoRecorder():
             acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
             reFFMPEG(self.tempFile, thisFPS, fileName, self.fps)
             return fileName, acT
+
+    def finishWithAudio(self, audioStream):
+        # fixes the fps, mux the audiostream and return an mp4
+        if self.isRunning():
+            fileName = getFileName('Videoo', 'mp4')
+            totalTime = self.closeCapture()
+            thisFPS = self.framescount / totalTime
+            acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
+            reMergeFFMPEG(self.tempFile, audioStream, thisFPS, self.fps, fileName)
+            return fileName, acT
+
+
 
 
 def reFFMPEG(iFile, iFPS, oFile, oFPS):
@@ -220,11 +237,11 @@ def mergeFFMPEG(videoStream, audioStream, videoOut, crf=24):
         os.remove(audioStream)
 
 
-def wavTo_m4a(inFile):
+def wavTo_m4a(inFile,outFile):
     file = getFileName("Audio",'m4a')
-    ret= subprocess.call(f"ffmpeg -i {inFile} {file} >> ffmpeg.log 2>&1", shell=True)
+    ret= subprocess.call(f"ffmpeg -i {inFile} {outFile} >> ffmpeg.log 2>&1", shell=True)
     if ret==0:
-        return file
+        removeFile(inFile)
 
 
 def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut,crf=24):
@@ -246,7 +263,7 @@ def markedFileName(fName,mark):
 
 def splitFilesInChunks(inFile, actTime, chunks=300):
     # split in chunks of 5 minutes
-    fileSize = os.path.getsize(inFile)/10e6  # filesiz in mb
+    fileSize = os.path.getsize(inFile)/1e6  # filesiz in mb
     if actTime<=chunks:
         print(f'Nothing to split, file is already small. Filesize: {fileSize} MB')
         return [inFile]
