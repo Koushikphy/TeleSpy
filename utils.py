@@ -200,7 +200,7 @@ class VideoRecorder():
     def finish(self):
         # fixes the fps and returns a mp4 file
         if self.isRunning():
-            fileName = getFileName('Videoo', 'mp4')
+            fileName = getFileName('Video', 'mp4')
             totalTime = self.closeCapture()
             thisFPS = self.framescount / totalTime
             acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
@@ -210,7 +210,7 @@ class VideoRecorder():
     def finishWithAudio(self, audioStream):
         # fixes the fps, mux the audiostream and return an mp4
         if self.isRunning():
-            fileName = getFileName('Videoo', 'mp4')
+            fileName = getFileName('Video', 'mp4')
             totalTime = self.closeCapture()
             thisFPS = self.framescount / totalTime
             acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
@@ -238,7 +238,6 @@ def mergeFFMPEG(videoStream, audioStream, videoOut, crf=24):
 
 
 def wavTo_m4a(inFile,outFile):
-    file = getFileName("Audio",'m4a')
     ret= subprocess.call(f"ffmpeg -i {inFile} {outFile} >> ffmpeg.log 2>&1", shell=True)
     if ret==0:
         removeFile(inFile)
@@ -255,7 +254,6 @@ def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut,crf=24):
 
 
 def markedFileName(fName,mark):
-    # fName = getFileName('Video', 'mp4')
     pth,fNme = os.path.split(fName)
     b,e = os.path.splitext(fNme)
     return os.path.join(pth,b+f'_{mark}'+e)
@@ -273,7 +271,6 @@ def splitFilesInChunks(inFile, actTime, chunks=300):
         sTime, eTime = i*chunks, (i+1)*chunks
         if eTime> actTime : 
             eTime = actTime
-        # print(sTime,eTime,actTime)
         fName = markedFileName(inFile,i+1)
         subprocess.call(
             f"ffmpeg -i {inFile} -ss {sTime} -to {eTime} {fName} >> ffmpeg.log 2>&1",

@@ -9,7 +9,6 @@ ADMIN = getEnv('ADMIN')
 bot = TeleBot(TOKEN, parse_mode='HTML')
 audioRecorder = AudioRecorder()
 videoRecorder = VideoRecorder()
-chunkSize = 600 # chunks in second
 
 # remind the user when a long recording in progress
 class Reminder:
@@ -173,14 +172,12 @@ def callback_query(call):
             return
     
         message = bot.send_message(user, "Processing please wait")
-        fileOrg, act = audioRecorder.finish(toM4A=True)
-        processAndUpload(user, fileOrg, act)
+        processAndUpload(user, *audioRecorder.finish(toM4A=True))
         deleteMessage(message)
 
     elif call.data == "cb_cancel_audio":
         audioRecorder.terminate()
-        message = bot.send_message(user, "Recording terminated")
-        deleteMessage(message,5)
+        bot.send_message(user, "Recording terminated")
 
     #------------------------------------------------------------------------
 
@@ -190,14 +187,12 @@ def callback_query(call):
             return
 
         message = bot.send_message(user, "Processing please wait")
-        fileOrg, act = videoRecorder.finish()
-        processAndUpload(user, fileOrg, act)
+        processAndUpload(user, *videoRecorder.finish())
         deleteMessage(message)
 
     elif call.data == "cb_cancel_videoonly":
         videoRecorder.terminate()
-        message = bot.send_message(user, "Recording terminated")
-        deleteMessage(message,5)
+        bot.send_message(user, "Recording terminated")
 
     #-----------------------------------------------------------------
     elif call.data == "cb_stop_video":
@@ -207,32 +202,29 @@ def callback_query(call):
 
         message = bot.send_message(user, "Processing please wait")
         audFile, _ = audioRecorder.finish()
-        fileOrg, act = videoRecorder.finishWithAudio(audFile)
-        processAndUpload(user, fileOrg, act)
+        processAndUpload(user, *videoRecorder.finishWithAudio(audFile))
         deleteMessage(message)
 
     elif call.data == "cb_cancel_video":
-        # break if fail, don't send message again
         videoRecorder.terminate()
         audioRecorder.terminate()
-        message = bot.send_message(user, "Recording terminated")
-        deleteMessage(message,5)
+        bot.send_message(user, "Recording terminated")
 
 
 
 
 
 def processAndUpload(user, file, act):
-
-    files = splitFilesInChunks(file, act, chunkSize)
-
+    files = splitFilesInChunks(file, act, chunks=600)
     nTxt = "The file will be split due to Telegram restrictions." if len(files)>1 else ""
-    message = bot.send_message(user, "Recording saved successfully. Wait while the bot uploads the file. " + nTxt)
+    message = bot.send_message(user, 
+        "Recording saved successfully. Wait while the bot uploads the file. " + nTxt)
     try:
         for file in files:
             with open(file, 'rb') as f:
                 if file.endswith('mp4'):
                     bot.send_video(user, f)
+                    # print(f)
                 else:
                     bot.send_audio(user, f)
     except:
