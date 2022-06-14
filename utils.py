@@ -220,21 +220,20 @@ class VideoRecorder():
 
 
 
-def reFFMPEG(iFile, iFPS, oFile, oFPS):
+def reFFMPEG(iFile, iFPS, oFile, oFPS, crf=24):
     # change fps of the video file, writes output to `ffmpeg.log`
-    ret = subprocess.call(f"ffmpeg -y -r {iFPS} -i {iFile} -r {oFPS} {oFile} >> ffmpeg.log 2>&1", shell=True)
+    ret = subprocess.call(f"ffmpeg -y -r {iFPS} -i {iFile} -r {oFPS} -vcodec libx265 -crf {crf} {oFile} >> ffmpeg.log 2>&1", shell=True)
     if ret==0:
-        os.remove(iFile) # remove the temporary file
+        removeFile(iFile)
 
 
-def mergeFFMPEG(videoStream, audioStream, videoOut, crf=24):
+def mergeFFMPEG(videoStream, audioStream, videoOut):
     # merge audio and video stream, writes output to `ffmpeg.log`
     ret = subprocess.call( f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} \
-                -vcodec libx265 -crf {crf} {videoOut} >> ffmpeg.log 2>&1",
+                  {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
     if ret==0:
-        os.remove(videoStream)
-        os.remove(audioStream)
+        removeFile(videoStream, audioStream)
 
 
 def wavTo_m4a(inFile,outFile):
@@ -298,35 +297,17 @@ if __name__ == '__main__':
     ra = AudioRecorder()
     rv = VideoRecorder()
 
-    ra.start()
+
+
     rv.start()
-
-    sleep(600)
-
-    s = time()
-    audFile, _ = ra.finish()
+    sleep(120)
     vidFile, _ = rv.finish()
+    print(vidFile)
+    
 
-
-    file = wavTo_m4a(audFile)
-    print(f"Time took: {time()-s}")
-
-
-    file = getFileName('Video', 'mp4')
-    mergeFFMPEG(vidFile, audFile, file)
-
-
-    print(f"Time took: {time()-s}")
-
-
-
-    # print(audFile, vidFile, file)
-
-
-#NOTES:
-# 1. re FPS and merging does not work properly in a single command so opt for dual step
-# 2. with 265 crf 381/555 and without 787/1010
-
-# TODO
-# 1. Video recorder finishWithAudio and normal finish
-# 2. all send try split block can be summed up in one function
+    rv.start()
+    ra.start()
+    sleep(120)
+    audFile, _ = ra.finish()
+    vidFile,act = rv.finishWithAudio(audFile)
+    print(vidFile)
