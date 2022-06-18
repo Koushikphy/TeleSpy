@@ -1,6 +1,7 @@
 from utils import * 
 from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import logging
 
 TOKEN = getEnv('TOKEN')
 ALLOWED_USERS = getEnv('ALLOWED_USERS', cast=int, isList=True)
@@ -44,20 +45,39 @@ def deleteMessage(message, delay=0):
         tempDelete(message)
 
 
-def isNotAuthorised(user):
+def make_logger():
+    #Create the logger
+    logger = logging.getLogger('Tel')
+    logger.setLevel(logging.INFO)
+    # file = os.path.join(os.path.expanduser('~'), 'ADT.log' )
+    fh = logging.FileHandler("tel.log")
+    fh.setLevel(logging.INFO)
+    fh.setFormatter(logging.Formatter("[%(asctime)s] - %(message)s","%d-%m-%Y %I:%M:%S %p"))
+    logger.addHandler(fh)
+    return logger
+
+logger = make_logger()
+
+
+
+
+def checkRequest(message):
+    user = message.from_user
+
     if user.id not in ALLOWED_USERS:
         bot.send_message(user.id, "You are not authorized to use this bot")
         bot.send_message(ADMIN,f'Incoming request from unregistered user {user.first_name} {user.last_name} ({user.id})')
+        logger.info(f'***Incoming request from unregistered user {user.first_name} {user.last_name} ({user.id})')
         return True
+    logger.info(f"User: {user.first_name} {user.last_name} ({user.id}); Command: {message.text}")
     return False
 
 
 @bot.message_handler(commands='start')
 def send_welcome(message):
-    user = message.from_user
-    if isNotAuthorised(user):
+    if checkRequest(message):
         return
-    bot.send_message(user.id, "Welcome to the spy bot")
+    bot.send_message(message.from_user.id, "Welcome to the spy bot")
 
 
 @bot.message_handler(commands='photo')
@@ -73,7 +93,7 @@ def send_photo2(message):
 
 def takePhoto(message, toDelete=False):
     user = message.from_user.id
-    if isNotAuthorised(message.from_user):
+    if checkRequest(message):
         return
 
     if videoRecorder.isRunning():
@@ -93,11 +113,10 @@ def takePhoto(message, toDelete=False):
 
 
 
-
 @bot.message_handler(commands='audio')
 def send_audio(message):
     user = message.from_user.id
-    if isNotAuthorised(message.from_user):
+    if checkRequest(message):
         return
 
     if audioRecorder.isRunning():
@@ -119,7 +138,7 @@ def audioMarkup():
 @bot.message_handler(commands='videoonly')
 def send_video(message):
     user = message.from_user.id
-    if isNotAuthorised(message.from_user):
+    if checkRequest(message):
         return
 
     if videoRecorder.isRunning():
@@ -141,7 +160,7 @@ def videoOnlyMarkup():
 @bot.message_handler(commands='video')
 def send_both(message):
     user = message.from_user.id
-    if isNotAuthorised(message.from_user):
+    if checkRequest(message):
         return
 
     if videoRecorder.isRunning() or audioRecorder.isRunning():
@@ -176,8 +195,7 @@ def callback_query(call):
         deleteMessage(message)
 
     elif call.data == "cb_cancel_audio":
-        audioRecorder.terminate()
-        bot.send_message(user, "Recording terminated")
+        terminate(user, audioRecorder)
 
     #------------------------------------------------------------------------
 
@@ -191,8 +209,7 @@ def callback_query(call):
         deleteMessage(message)
 
     elif call.data == "cb_cancel_videoonly":
-        videoRecorder.terminate()
-        bot.send_message(user, "Recording terminated")
+        terminate(user, videoRecorder)
 
     #-----------------------------------------------------------------
     elif call.data == "cb_stop_video":
@@ -206,15 +223,21 @@ def callback_query(call):
         deleteMessage(message)
 
     elif call.data == "cb_cancel_video":
-        videoRecorder.terminate()
-        audioRecorder.terminate()
-        bot.send_message(user, "Recording terminated")
+        terminate(user, videoRecorder, audioRecorder)
 
 
+
+
+def terminate(user, *recorders):
+    for rec in recorders: 
+        rec.terminate()
+    bot.send_message(user, "Recording terminated")
+    logger.info('Recording terminated')
 
 
 
 def processAndUpload(user, file, act):
+    logger.info(f"Recording finished: {os.path.basename(file)} ({act:.2f} sec) ({os.path.getsize(file)/1e6:.2f} MB)")
     files = splitFilesInChunks(file, act, chunks=600)
     nTxt = "The file will be split due to Telegram restrictions." if len(files)>1 else ""
     message = bot.send_message(user, 

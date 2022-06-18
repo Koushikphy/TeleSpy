@@ -15,7 +15,6 @@ ASSETS_DIR = 'assets'
 # https://stackoverflow.com/questions/14140495/how-to-capture-a-video-and-audio-in-python-from-a-camera-or-webcam
 
 class RepeatTimer(Timer):
-
     def run(self):
         while not self.finished.wait(self.interval):
             self.function(*self.args, **self.kwargs)
@@ -203,9 +202,11 @@ class VideoRecorder():
             fileName = getFileName('Video', 'mp4')
             totalTime = self.closeCapture()
             thisFPS = self.framescount / totalTime
-            acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
+            # acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
+            # print(totalTime, acT, thisFPS, self.fps)
+            # subprocess.call(f"ffprobe.exe {self.tempFile}")
             reFFMPEG(self.tempFile, thisFPS, fileName, self.fps)
-            return fileName, acT
+            return fileName, totalTime
 
     def finishWithAudio(self, audioStream):
         # fixes the fps, mux the audiostream and return an mp4
@@ -213,9 +214,9 @@ class VideoRecorder():
             fileName = getFileName('Video', 'mp4')
             totalTime = self.closeCapture()
             thisFPS = self.framescount / totalTime
-            acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
+            # acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
             reMergeFFMPEG(self.tempFile, audioStream, thisFPS, self.fps, fileName)
-            return fileName, acT
+            return fileName, totalTime
 
 
 
@@ -261,18 +262,19 @@ def markedFileName(fName,mark):
 def splitFilesInChunks(inFile, actTime, chunks=300):
     # split in chunks of 5 minutes
     fileSize = os.path.getsize(inFile)/1e6  # filesiz in mb
-    if actTime<=chunks:
+    if fileSize <= 48.0: # telegram file size limit 50MB
         print(f'Nothing to split, file is already small. Filesize: {fileSize} MB')
         return [inFile]
     files = []
     nChnks = int(actTime/chunks)
     for i in range(nChnks+1):
-        sTime, eTime = i*chunks, (i+1)*chunks
-        if eTime> actTime : 
-            eTime = actTime
+        # sTime, eTime = i*chunks, (i+1)*chunks
+        # if eTime> actTime : 
+            # eTime = actTime
         fName = markedFileName(inFile,i+1)
         subprocess.call(
-            f"ffmpeg -i {inFile} -ss {sTime} -to {eTime} {fName} >> ffmpeg.log 2>&1",
+            # f"ffmpeg -i {inFile} -ss {sTime} -to {eTime} {fName} >> ffmpeg.log 2>&1",
+            f"ffmpeg -i {inFile} -ss {i*chunks} -t {chunks} {fName} >> ffmpeg.log 2>&1",
         shell=True)
         files.append(fName)
     return files
