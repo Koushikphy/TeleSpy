@@ -11,9 +11,10 @@ Take Photo/Audio/Video from webcam by remotely controlling it using a Telegram b
 1. Download and install the `ffmpeg` library for video processing. The `ffmpeg` executable should be available in the path.
 2. Start the bot with `pipenv run bot`
 1. Available commands
-    1. `/photo` - Take photo  
+    1. `/photo` - Take a temporary photo  
     2. `/audio` - Take audio  
     3. `/video` - Take video  
+    4. `/photo_keep` - Take and keep photo
     4. `/videoonly` - Take video without audio  
 
 **NOTE:**

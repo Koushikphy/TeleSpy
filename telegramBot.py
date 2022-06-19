@@ -37,6 +37,7 @@ remind = Reminder()
 
 
 def deleteMessage(message, delay=0):
+    # delete a message, optionally define a delay for the delete
     def tempDelete(message):
         bot.delete_message(message.chat.id, message.message_id)
     if delay: # dely non zero means delete some times later
@@ -49,7 +50,6 @@ def make_logger():
     #Create the logger
     logger = logging.getLogger('Tel')
     logger.setLevel(logging.INFO)
-    # file = os.path.join(os.path.expanduser('~'), 'ADT.log' )
     fh = logging.FileHandler("tel.log")
     fh.setLevel(logging.INFO)
     fh.setFormatter(logging.Formatter("[%(asctime)s] - %(message)s","%d-%m-%Y %I:%M:%S %p"))
@@ -62,6 +62,7 @@ logger = make_logger()
 
 
 def checkRequest(message):
+    # check if the request is from a valid user, if not send a notification to admin
     user = message.from_user
 
     if user.id not in ALLOWED_USERS:
@@ -92,6 +93,7 @@ def send_photo2(message):
 
 
 def takePhoto(message, toDelete=False):
+    # capture and send the photo, optionally delete after 5 second
     user = message.from_user.id
     if checkRequest(message):
         return
@@ -115,6 +117,7 @@ def takePhoto(message, toDelete=False):
 
 @bot.message_handler(commands='audio')
 def send_audio(message):
+    # start audio recording
     user = message.from_user.id
     if checkRequest(message):
         return
@@ -226,17 +229,8 @@ def callback_query(call):
         terminate(user, videoRecorder, audioRecorder)
 
 
-
-
-def terminate(user, *recorders):
-    for rec in recorders: 
-        rec.terminate()
-    bot.send_message(user, "Recording terminated")
-    logger.info('Recording terminated')
-
-
-
 def processAndUpload(user, file, act):
+    # process recording and send to user
     logger.info(f"Recording finished: {os.path.basename(file)} ({act:.2f} sec) ({os.path.getsize(file)/1e6:.2f} MB)")
     files = splitFilesInChunks(file, act, chunks=600)
     nTxt = "The file will be split due to Telegram restrictions." if len(files)>1 else ""
@@ -247,7 +241,6 @@ def processAndUpload(user, file, act):
             with open(file, 'rb') as f:
                 if file.endswith('mp4'):
                     bot.send_video(user, f)
-                    # print(f)
                 else:
                     bot.send_audio(user, f)
     except:
@@ -259,6 +252,12 @@ def processAndUpload(user, file, act):
     deleteMessage(message)
 
 
+
+def terminate(user, *recorders):
+    for rec in recorders: 
+        rec.terminate()
+    bot.send_message(user, "Recording terminated")
+    logger.info('Recording terminated')
 
 
 

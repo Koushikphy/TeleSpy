@@ -202,9 +202,6 @@ class VideoRecorder():
             fileName = getFileName('Video', 'mp4')
             totalTime = self.closeCapture()
             thisFPS = self.framescount / totalTime
-            # acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
-            # print(totalTime, acT, thisFPS, self.fps)
-            # subprocess.call(f"ffprobe.exe {self.tempFile}")
             reFFMPEG(self.tempFile, thisFPS, fileName, self.fps)
             return fileName, totalTime
 
@@ -214,7 +211,6 @@ class VideoRecorder():
             fileName = getFileName('Video', 'mp4')
             totalTime = self.closeCapture()
             thisFPS = self.framescount / totalTime
-            # acT = self.fps*totalTime/thisFPS # actual time of the video after the rescaling FPS
             reMergeFFMPEG(self.tempFile, audioStream, thisFPS, self.fps, fileName)
             return fileName, totalTime
 
@@ -223,29 +219,35 @@ class VideoRecorder():
 
 def reFFMPEG(iFile, iFPS, oFile, oFPS, crf=24):
     # change fps of the video file, writes output to `ffmpeg.log`
-    ret = subprocess.call(f"ffmpeg -y -r {iFPS} -i {iFile} -r {oFPS} -vcodec libx265 -crf {crf} {oFile} >> ffmpeg.log 2>&1", shell=True)
+    ret = subprocess.call(f"ffmpeg -y -r {iFPS} -i {iFile} -r {oFPS} \
+            -vcodec libx265 -crf {crf} {oFile} >> ffmpeg.log 2>&1"
+            , shell=True)
     if ret==0:
         removeFile(iFile)
 
 
 def mergeFFMPEG(videoStream, audioStream, videoOut):
     # merge audio and video stream, writes output to `ffmpeg.log`
-    ret = subprocess.call( f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} \
-                  {videoOut} >> ffmpeg.log 2>&1",
+    ret = subprocess.call( 
+        f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} \
+                {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
     if ret==0:
         removeFile(videoStream, audioStream)
 
 
 def wavTo_m4a(inFile,outFile):
+    # convert .wav to .m4a file
     ret= subprocess.call(f"ffmpeg -i {inFile} {outFile} >> ffmpeg.log 2>&1", shell=True)
     if ret==0:
         removeFile(inFile)
 
 
 def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut,crf=24):
+    # change fps and attach the audio stream 
     ret = subprocess.call(
-        f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} -r {oFPS} -i {audioStream} -vcodec libx265 -crf {crf} {videoOut} >> ffmpeg.log 2>&1",
+        f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} \
+            -r {oFPS} -i {audioStream} -vcodec libx265 -crf {crf} {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
     if ret==0:
         removeFile(videoStream, audioStream)
@@ -253,14 +255,8 @@ def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut,crf=24):
 
 
 
-def markedFileName(fName,mark):
-    pth,fNme = os.path.split(fName)
-    b,e = os.path.splitext(fNme)
-    return os.path.join(pth,b+f'_{mark}'+e)
-
-
-def splitFilesInChunks(inFile, actTime, chunks=300):
-    # split in chunks of 5 minutes
+def splitFilesInChunks(inFile, actTime, chunks=600):
+    # split in chunks of 10 minutes
     fileSize = os.path.getsize(inFile)/1e6  # filesiz in mb
     if fileSize <= 48.0: # telegram file size limit 50MB
         print(f'Nothing to split, file is already small. Filesize: {fileSize} MB')
@@ -268,14 +264,12 @@ def splitFilesInChunks(inFile, actTime, chunks=300):
     files = []
     nChnks = int(actTime/chunks)
     for i in range(nChnks+1):
-        # sTime, eTime = i*chunks, (i+1)*chunks
-        # if eTime> actTime : 
-            # eTime = actTime
-        fName = markedFileName(inFile,i+1)
+        # Put a _`n` at the end of the splitted file name
+        fName = f'_{i}'.join(os.path.splitext(inFile)) 
         subprocess.call(
-            # f"ffmpeg -i {inFile} -ss {sTime} -to {eTime} {fName} >> ffmpeg.log 2>&1",
-            f"ffmpeg -i {inFile} -ss {i*chunks} -t {chunks} {fName} >> ffmpeg.log 2>&1",
+            f"ffmpeg -ss {i*chunks} -i {inFile} -t {chunks} -c copy {fName} >> ffmpeg.log 2>&1",
         shell=True)
+        # put `ss` before the input file to properly copy the initial keyframes
         files.append(fName)
     return files
 
