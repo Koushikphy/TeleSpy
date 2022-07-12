@@ -99,13 +99,17 @@ def takePhoto(message, toDelete=False):
         return
 
     if videoRecorder.isRunning():
-        bot.send_message(user, "Video recording is in progress. Can't capture photo.")
-        return
-
-    waitM = bot.send_message(user, "Wait while the bot takes the photo")
-    file = takeScreenShot()
+        # bot.send_message(user, "Video recording is in progress. Can't capture photo.")
+        waitM = bot.send_message(user, "Video recording is in progress. Wait while the bot takes the photo")
+        file = videoRecorder.captureAphoto()
+    else:
+        waitM = bot.send_message(user, "Wait while the bot takes the photo")
+        file = takeScreenShot()
     with open(file, 'rb') as f:
-        photoM = bot.send_photo(user, f, caption= "This photo will be deleted after 5 seconds." if toDelete else None)
+        try:
+            photoM = bot.send_photo(user, f, caption= "This photo will be deleted after 5 seconds." if toDelete else None)
+        except Exception as e:
+            logger.info(e)
     bot.delete_message(waitM.chat.id, waitM.message_id)
 
     if toDelete: # wait for 5 sectond and delete
