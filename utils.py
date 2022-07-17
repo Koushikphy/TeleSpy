@@ -142,6 +142,7 @@ class VideoRecorder():
         self.frames = self.getWidthHeight()
         self.video_writer = cv2.VideoWriter_fourcc(*self.fourcc)
         self.frame_counts = 1
+        self._capturePic = False
 
     def isRunning(self):
         return self._running
@@ -165,6 +166,9 @@ class VideoRecorder():
             if ret and self.video_out.isOpened():
                 self.video_out.write(video_frame)
                 self.framescount += 1
+                if self._capturePic:
+                    cv2.imwrite(self.picName, video_frame)  #save image
+                    self._capturePic = False
                 # show the video in a window
                 # cv2.imshow('video_frame', gray)
                 # cv2.waitKey(1)
@@ -215,7 +219,13 @@ class VideoRecorder():
             return fileName, totalTime
 
 
-
+    def captureAphoto(self):
+        self._capturePic =True
+        self.picName = getFileName('Photo', 'jpg')
+        while True:
+            if not self._capturePic: # photo is captured
+                return self.picName
+        
 
 def reFFMPEG(iFile, iFPS, oFile, oFPS, crf=24):
     # change fps of the video file, writes output to `ffmpeg.log`
