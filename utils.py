@@ -219,7 +219,7 @@ class VideoRecorder():
 
 def reFFMPEG(iFile, iFPS, oFile, oFPS, crf=24):
     # change fps of the video file, writes output to `ffmpeg.log`
-    ret = subprocess.call(f"ffmpeg -y -r {iFPS} -i {iFile} -r {oFPS} \
+    ret = subprocess.call(f"ffmpeg -hide_banner -y -r {iFPS} -i {iFile} -r {oFPS} \
             -vcodec libx265 -crf {crf} {oFile} >> ffmpeg.log 2>&1"
             , shell=True)
     if ret==0:
@@ -229,7 +229,7 @@ def reFFMPEG(iFile, iFPS, oFile, oFPS, crf=24):
 def mergeFFMPEG(videoStream, audioStream, videoOut):
     # merge audio and video stream, writes output to `ffmpeg.log`
     ret = subprocess.call( 
-        f"ffmpeg -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} \
+        f"ffmpeg -hide_banner -ac 2 -y -channel_layout stereo -i {videoStream} -i {audioStream} \
                 {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
     if ret==0:
@@ -238,7 +238,7 @@ def mergeFFMPEG(videoStream, audioStream, videoOut):
 
 def wavTo_m4a(inFile,outFile):
     # convert .wav to .m4a file
-    ret= subprocess.call(f"ffmpeg -i {inFile} {outFile} >> ffmpeg.log 2>&1", shell=True)
+    ret= subprocess.call(f"ffmpeg -hide_banner -i {inFile} {outFile} >> ffmpeg.log 2>&1", shell=True)
     if ret==0:
         removeFile(inFile)
 
@@ -246,7 +246,7 @@ def wavTo_m4a(inFile,outFile):
 def reMergeFFMPEG(videoStream, audioStream,iFPS,oFPS, videoOut,crf=24):
     # change fps and attach the audio stream 
     ret = subprocess.call(
-        f"ffmpeg -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} \
+        f"ffmpeg -hide_banner -ac 2 -y -channel_layout stereo -r {iFPS} -i {videoStream} \
             -r {oFPS} -i {audioStream} -vcodec libx265 -crf {crf} {videoOut} >> ffmpeg.log 2>&1",
         shell=True)
     if ret==0:
@@ -267,7 +267,7 @@ def splitFilesInChunks(inFile, actTime, chunks=600):
         # Put a _`n` at the end of the splitted file name
         fName = f'_{i}'.join(os.path.splitext(inFile)) 
         subprocess.call(
-            f"ffmpeg -ss {i*chunks} -i {inFile} -t {chunks} -c copy {fName} >> ffmpeg.log 2>&1",
+            f"ffmpeg -hide_banner -ss {i*chunks} -i {inFile} -t {chunks} -c copy {fName} >> ffmpeg.log 2>&1",
         shell=True)
         # put `ss` before the input file to properly copy the initial keyframes
         files.append(fName)
@@ -287,6 +287,20 @@ def splitFilesInChunks(inFile, actTime, chunks=600):
 
 
 
+class Test:
+
+    def startRec(self):
+        # self.recorder = subprocess.Popen(['ffmpeg', '-f', 'dshow', '-rtbufsize', '2000M', '-t', '60', '-i', 'video=HP HD Camera:audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)', '-y', '-vcodec', 'libx264', '-crf', '24', 'output.mp4'],shell=False)
+        self.recorder = subprocess.Popen(['ffmpeg', '-hide_banner', '-f', 'dshow', '-rtbufsize', '2000M', '-t', '60',  '-i', "video=HP HD Camera:audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)", '-y', 'output.mp4'], shell=False)
+        # self.recorder = subprocess.Popen('ffmpeg -f dshow -rtbufsize 2000M -t 10 -i video="HP HD Camera":audio="Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)" -y -vcodec libx264 -crf 24 output.mp4', shell=True)
+
+    def close(self):
+        self.recorder.terminate()
+        self.recorder.kill()
+        # os.killpg(os.getpgid(self.recorder.pid), signal.SIGTERM)
+        # os.kill(self.recorder.pid, signal.SIGTERM)
+
+
 
 if __name__ == '__main__':
     # # # os.remove('./output_new.wav')
@@ -295,10 +309,10 @@ if __name__ == '__main__':
 
 
 
-    rv.start()
-    sleep(120)
-    vidFile, _ = rv.finish()
-    print(vidFile)
+    # rv.start()
+    # sleep(120)
+    # vidFile, _ = rv.finish()
+    # print(vidFile)
     
 
     rv.start()
@@ -307,3 +321,12 @@ if __name__ == '__main__':
     audFile, _ = ra.finish()
     vidFile,act = rv.finishWithAudio(audFile)
     print(vidFile)
+
+
+    # subprocess.Popen(['ffmpeg', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'],shell=False)
+    tt = Test()
+
+
+    tt.startRec()
+    sleep(30)
+    tt.close()
