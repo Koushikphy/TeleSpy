@@ -299,23 +299,52 @@ def splitFilesInChunks(inFile, actTime, chunks=600):
 
 class Test:
 
-    def startRec(self):
-        # self.recorder = subprocess.Popen(['ffmpeg', '-f', 'dshow', '-rtbufsize', '2000M', '-t', '60', '-i', 'video=HP HD Camera:audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)', '-y', '-vcodec', 'libx264', '-crf', '24', 'output.mp4'],shell=False)
-        self.recorder = subprocess.Popen(['ffmpeg', '-hide_banner', '-f', 'dshow', '-rtbufsize', '2000M', '-t', '60',  '-i', "video=HP HD Camera:audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)", '-y', 'output.mp4'], shell=False)
-        # self.recorder = subprocess.Popen('ffmpeg -f dshow -rtbufsize 2000M -t 10 -i video="HP HD Camera":audio="Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)" -y -vcodec libx264 -crf 24 output.mp4', shell=True)
+    def __init__(self):
+        self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -rtbufsize 2G'.split()
+        self.outFlags    = "-vcodec libx264 -crf 24".split()
+        self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
+        self.videoInput  = "video=HP HD Camera"
+        self.isRunning   = False
+        self.logFile     = open('tel.log','a')
+
+
+    def startRec(self, outputFile, audioOnly=False):
+        inputDevice = self.audioInput if audioOnly else f"{self.videoInput}:{self.audioInput}"
+        self.runCommand([*self.commonFlags, '-i', inputDevice, *self.outFlags, outputFile])
+
+
+    def takePicture(self,outputFile):
+        self.runCommand([*self.commonFlags, '-i', self.videoInput, '-frames:v', '1', outputFile])
+        self.release()
+
+
+    def runCommand(self, command):
+        if self.isRunning : return
+        self.isRunning = True
+        self.recorder = subprocess.Popen(
+                command,
+                shell=False, 
+                stdin=subprocess.PIPE,
+                stdout=self.logFile,
+                stderr=self.logFile,
+            )
 
     def close(self):
+        self.recorder.stdin.write('q'.encode("GBK")) 
+        self.release()
+
+    def release(self):
+        self.recorder.communicate()
+        self.recorder.wait()
+        self.isRunning = False
         self.recorder.terminate()
         self.recorder.kill()
-        # os.killpg(os.getpgid(self.recorder.pid), signal.SIGTERM)
-        # os.kill(self.recorder.pid, signal.SIGTERM)
-
 
 
 if __name__ == '__main__':
     # # # os.remove('./output_new.wav')
-    ra = AudioRecorder()
-    rv = VideoRecorder()
+    # ra = AudioRecorder()
+    # rv = VideoRecorder()
 
 
 
@@ -325,18 +354,20 @@ if __name__ == '__main__':
     # print(vidFile)
     
 
-    rv.start()
-    ra.start()
-    sleep(120)
-    audFile, _ = ra.finish()
-    vidFile,act = rv.finishWithAudio(audFile)
-    print(vidFile)
+    # rv.start()
+    # ra.start()
+    # sleep(120)
+    # audFile, _ = ra.finish()
+    # vidFile,act = rv.finishWithAudio(audFile)
+    # print(vidFile)
 
 
-    # subprocess.Popen(['ffmpeg', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'],shell=False)
-    tt = Test()
+    # # subprocess.Popen(['ffmpeg', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'],shell=False)
+    # tt = Test()
 
 
-    tt.startRec()
-    sleep(30)
-    tt.close()
+    # tt.startRec()
+    # sleep(30)
+    # tt.close()
+
+    takeScreenShot()
