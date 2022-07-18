@@ -1,27 +1,22 @@
 from utils import * 
 from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-import logging
+import logging, shutil
 
-TOKEN = getEnv('TOKEN')
-ALLOWED_USERS = getEnv('ALLOWED_USERS', cast=int, isList=True)
-ADMIN = getEnv('ADMIN')
+TOKEN = os.getenv('TOKEN')
+ALLOWED_USERS = [int(i) for i in os.getenv('ALLOWED_USERS').split()]  
+ADMIN = os.getenv('ADMIN')
 
 bot = TeleBot(TOKEN, parse_mode='HTML')
-# audioRecorder = AudioRecorder()
-# videoRecorder = VideoRecorder()
-
 
 
 
 # remind the user when a long recording in progress
 class Reminder:
-
     def __init__(self, timeOut=10 * 60):
         self.timeOut = timeOut  # interval to notify the user, 10 minute default
         self.timer: Timer
         self.userid: int = 0
-
 
     def remind(self, userid: int):
         self.userid = userid
@@ -97,7 +92,6 @@ def send_photo(message):
         return
 
     waitM = bot.send_message(user, "Wait while the bot takes the photo")
-    # file = takeScreenShot()
     file = recorder.takePicture()
 
     with open(file, 'rb') as f:
@@ -106,17 +100,8 @@ def send_photo(message):
         except Exception as e:
             logger.info(e)
     
-    sleep(5)
-    # bot.edit_message_text("",photoM.chat.id, photoM.message_id,reply_markup=None)
-    bot.edit_message_caption("",photoM.chat.id, photoM.message_id,reply_markup=None)
-    # delM   = bot.send_message(user,"This photo will be deleted after 5 seconds.", reply_markup=photoMarkup())
-    # photoK.queueToDelete(message, photoM, delM)
+    photoK.queueToDelete(message, photoM)
     bot.delete_message(waitM.chat.id, waitM.message_id)
-
-
-
-
-
 
 
 def photoMarkup():
@@ -128,28 +113,24 @@ def photoMarkup():
 
 
 class PhotoKeeper():
-
     def __init__(self):
         self.delay = 5  # 5
 
     def tmpDelete(self,*messages):
-        print(messages)
         for i in messages:
             bot.delete_message(i.chat.id, i.message_id)
 
-    def queueToDelete(self, commandM, photoM, keyboardM):
-        self.timer = Timer(self.delay, self.tmpDelete,[commandM, photoM, keyboardM])
+    def queueToDelete(self, commandM, photoM):
+        self.photoM = photoM
+        self.timer = Timer(self.delay, self.tmpDelete,[commandM, photoM])
         self.timer.start()
         
     def keepPhoto(self):
         self.timer.cancel()
+        bot.edit_message_caption("",self.photoM.chat.id, self.photoM.message_id,reply_markup=None)
 
 
 photoK = PhotoKeeper()
-
-
-
-
 
 
 @bot.message_handler(commands='audio')
@@ -201,14 +182,12 @@ def videoMarkup():
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
-    deleteMessage(call.message)
-
 
     if call.data == "cb_stop_photo":
-        print('--------------------------------------------here')
         photoK.keepPhoto()
         return
 
+    deleteMessage(call.message)
     remind.cancel()  # clear all reminder
     user = call.from_user.id
 
@@ -217,13 +196,11 @@ def callback_query(call):
         return
 
     if call.data in ["cb_stop_audio", "cb_stop_video"]:
-        # message = bot.send_message(user, "Processing please wait")
         file, act = recorder.close()
 
         logger.info(f"Recording finished: {os.path.basename(file)} ({act:.2f} sec) ({os.path.getsize(file)/1e6:.2f} MB)")
-        files = splitFilesInChunks(file, act, chunks=300)
+        files = splitFilesInChunks(file)
         nTxt = "The file will be split due to Telegram restrictions." if len(files)>1 else ""
-        # deleteMessage(message)
         message = bot.send_message(user, 
             "Recording saved successfully. Wait while the bot uploads the file. " + nTxt)
         try:
@@ -236,16 +213,12 @@ def callback_query(call):
         except:
             bot.send_message(user, 
             f"Something went wrong while uploading the file file. You can find the file stored as {file}")
-        finally:
-            if len(files)!=1: 
-                for f in file:
-                    os.remove(f)
 
         deleteMessage(message)
 
 
     elif call.data in ["cb_cancel_audio","cb_cancel_video"]:
-        file,_= recorder.close(delete=True)
+        file,_= recorder.close()
         os.remove(file)
         bot.send_message(user, "Recording terminated")
         logger.info('Recording terminated')
