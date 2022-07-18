@@ -297,25 +297,36 @@ def splitFilesInChunks(inFile, actTime, chunks=600):
 
 
 
-class Test:
+class AVRecorder:
 
     def __init__(self):
-        self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -rtbufsize 2G'.split()
-        self.outFlags    = "-vcodec libx264 -crf 24".split()
-        self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
-        self.videoInput  = "video=HP HD Camera"
+        self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -video_size 1280x720 -rtbufsize 2G'.split()
+        self.vidFlags    = "-vcodec libx265 -crf 28 -r 21".split()
+        # self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
+        # self.videoInput  = "video=HP HD Camera"
+        self.videoInput  = "video=GENERAL WEBCAM"
+        self.audioInput  = "audio=Microphone (GENERAL WEBCAM)"
         self.isRunning   = False
         self.logFile     = open('tel.log','a')
+        
+
+    def startVideoRec(self):
+        self.fileName = getFileName('Video', 'mp4')
+        self.startTime = time()
+        self.runCommand([*self.commonFlags, '-i', f"{self.videoInput}:{self.audioInput}", *self.vidFlags, self.fileName])
 
 
-    def startRec(self, outputFile, audioOnly=False):
-        inputDevice = self.audioInput if audioOnly else f"{self.videoInput}:{self.audioInput}"
-        self.runCommand([*self.commonFlags, '-i', inputDevice, *self.outFlags, outputFile])
+    def startAudeoRec(self):
+        self.fileName = getFileName('Audio', 'm4a')
+        self.startTime = time()
+        self.runCommand([*self.commonFlags, '-i', self.audioInput, self.fileName])
 
 
-    def takePicture(self,outputFile):
-        self.runCommand([*self.commonFlags, '-i', self.videoInput, '-frames:v', '1', outputFile])
+    def takePicture(self):
+        fileName = getFileName('Photo', 'jpg')
+        self.runCommand([*self.commonFlags, '-i', self.videoInput, '-frames:v', '1', fileName])
         self.release()
+        return fileName
 
 
     def runCommand(self, command):
@@ -329,9 +340,12 @@ class Test:
                 stderr=self.logFile,
             )
 
-    def close(self):
+    def close(self,delete=False):
         self.recorder.stdin.write('q'.encode("GBK")) 
         self.release()
+        duration = time() - self.startTime
+        return self.fileName, duration
+
 
     def release(self):
         self.recorder.communicate()
@@ -362,7 +376,7 @@ if __name__ == '__main__':
     # print(vidFile)
 
 
-    # # subprocess.Popen(['ffmpeg', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'],shell=False)
+    # subprocess.Popen(['ffmpeg', '-list_devices', 'true', '-f', 'dshow', '-i', 'dummy'],shell=False)
     # tt = Test()
 
 
