@@ -1,9 +1,9 @@
 import os
 import subprocess
-from time import sleep, time
-from datetime import datetime
-from threading import Thread, Timer
+from time import time
 from glob import glob
+from threading import Timer
+from datetime import datetime
 
 
 ASSETS_DIR = 'assets'
@@ -56,6 +56,7 @@ class AVRecorder:
     def __init__(self):
         self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -video_size 1280x720 -rtbufsize 2G'.split()
         self.vidFlags    = "-vcodec libx265 -crf 28 -r 21".split()
+        # get list of devices with `ffmpeg -list_devices true -f dshow -i dummy`
         # self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
         # self.videoInput  = "video=HP HD Camera"
         self.videoInput  = "video=GENERAL WEBCAM"
@@ -76,9 +77,11 @@ class AVRecorder:
 
 
     def takePicture(self):
-        fileName = getFileName('Photo', 'jpg')
-        self.runCommand([*self.commonFlags, '-i', self.videoInput, '-frames:v', '1', fileName])
+        # take 5 photo to focus the camera and use the last photo
+        self.runCommand([*self.commonFlags, '-i', self.videoInput, '-frames:v', '5', f'{TMP_DIR}/pic%03d.jpg'])
         self.release()
+        fileName = getFileName('Photo', 'jpg')
+        os.rename(f'{TMP_DIR}/pic005.jpg',fileName)
         return fileName
 
 
