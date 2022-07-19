@@ -107,12 +107,13 @@ def send_photo(message):
 def photoMarkup():
     markup = InlineKeyboardMarkup()
     markup.row_width = 1
-    markup.add(InlineKeyboardButton("Keep this photo", callback_data="cb_stop_photo"))
+    markup.add(InlineKeyboardButton("Keep this photo", callback_data="cb_keep_photo"))
     return markup
 
 
 
 class PhotoKeeper():
+    # if multiple photos are present this will mess up the callback
     def __init__(self):
         self.delay = 5  # 5
 
@@ -144,21 +145,13 @@ def send_audio(message):
         bot.send_message(user, "Recording already in progress.")
     else:
         recorder.startAudeoRec()
-        bot.send_message(user, "Recording in progress.", reply_markup=audioMarkup())
+        bot.send_message(user, "Recording in progress.", reply_markup=mediaMarkup())
         remind.remind(user)
-
-
-def audioMarkup():
-    markup = InlineKeyboardMarkup()
-    markup.row_width = 2
-    markup.add(InlineKeyboardButton("Finish", callback_data="cb_stop_audio"),
-               InlineKeyboardButton("Cancel", callback_data="cb_cancel_audio"))
-    return markup
 
 
 
 @bot.message_handler(commands='video')
-def send_both(message):
+def send_video(message):
     user = message.from_user.id
     if checkRequest(message):
         return
@@ -167,23 +160,25 @@ def send_both(message):
         bot.send_message(user, "Recording already in progress.")
     else:
         recorder.startVideoRec()
-        bot.send_message(user, "Recording in progress.", reply_markup=videoMarkup())
+        bot.send_message(user, "Recording in progress.", reply_markup=mediaMarkup())
         remind.remind(user)
 
 
-def videoMarkup():
+
+def mediaMarkup():
     markup = InlineKeyboardMarkup()
     markup.row_width = 2
-    markup.add(InlineKeyboardButton("Finish", callback_data="cb_stop_video"),
-               InlineKeyboardButton("Cancel", callback_data="cb_cancel_video"))
+    markup.add(InlineKeyboardButton("Finish", callback_data="cb_stop_recording"),
+               InlineKeyboardButton("Cancel", callback_data="cb_cancel_recording"))
     return markup
+
 
 
 
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
 
-    if call.data == "cb_stop_photo":
+    if call.data == "cb_keep_photo":
         photoK.keepPhoto()
         return
 
@@ -195,7 +190,7 @@ def callback_query(call):
         bot.send_message(user, "No recording is currently in progress !!!")
         return
 
-    if call.data in ["cb_stop_audio", "cb_stop_video"]:
+    if call.data == "cb_stop_recording":
         file, act = recorder.close()
 
         logger.info(f"Recording finished: {os.path.basename(file)} ({act:.2f} sec) ({os.path.getsize(file)/1e6:.2f} MB)")
@@ -217,7 +212,7 @@ def callback_query(call):
         deleteMessage(message)
 
 
-    elif call.data in ["cb_cancel_audio","cb_cancel_video"]:
+    elif call.data == "cb_cancel_recording":
         file,_= recorder.close()
         os.remove(file)
         bot.send_message(user, "Recording terminated")

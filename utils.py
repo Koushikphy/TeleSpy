@@ -5,6 +5,7 @@ from datetime import datetime
 from threading import Thread, Timer
 from glob import glob
 
+
 ASSETS_DIR = 'assets'
 TMP_DIR = f"{ASSETS_DIR}/tmp"
 LOG_FILE = open('ffm.log','a')
@@ -25,20 +26,21 @@ def getFileName(name: str, ext: str) -> str:
 
 
 
-def splitFilesInChunks(inFile, chunks=10):
+def splitFilesInChunks(inFile, chunks=300):
     # split in chunks of 10 minutes
-    # if os.path.getsize(inFile)/1e6 <= 48.0: # telegram file size limit 50MB
-    #     return [inFile]
+    if os.path.getsize(inFile)/1e6 <= 48.0: # telegram file size limit 50MB
+        return [inFile]
 
     if os.path.exists(TMP_DIR):
         for f in glob(f'{TMP_DIR}/*'): os.remove(f)
     else:
         os.makedirs(TMP_DIR)
 
+    _, extn = os.path.splitext(inFile)
 
     subprocess.call(
         ['ffmpeg', '-y','-i', inFile, '-f', 'segment', '-segment_time', f'{chunks}', 
-        '-c', 'copy', '-reset_timestamps', 'true', f'{TMP_DIR}/out%03d.mp4'],
+        '-c', 'copy', '-reset_timestamps', 'true', f'{TMP_DIR}/out%03d.{extn}'],
         shell=False,
         stdin=subprocess.PIPE,
         stdout=LOG_FILE,
@@ -54,10 +56,10 @@ class AVRecorder:
     def __init__(self):
         self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -video_size 1280x720 -rtbufsize 2G'.split()
         self.vidFlags    = "-vcodec libx265 -crf 28 -r 21".split()
-        self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
-        self.videoInput  = "video=HP HD Camera"
-        # self.videoInput  = "video=GENERAL WEBCAM"
-        # self.audioInput  = "audio=Microphone (GENERAL WEBCAM)"
+        # self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
+        # self.videoInput  = "video=HP HD Camera"
+        self.videoInput  = "video=GENERAL WEBCAM"
+        self.audioInput  = "audio=Microphone (GENERAL WEBCAM)"
         self.isRunning   = False
 
 
