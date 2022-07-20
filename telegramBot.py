@@ -94,41 +94,50 @@ def send_photo(message):
     waitM = bot.send_message(user, "Wait while the bot takes the photo")
     file = recorder.takePicture()
 
+    ranStr = getRandomString()
+
     with open(file, 'rb') as f:
         try:
-            photoM = bot.send_photo(user, f, caption="This photo will be deleted after 5 seconds.", reply_markup=photoMarkup())
+            photoM = bot.send_photo(user, f, caption="This photo will be deleted after 5 seconds.", 
+                reply_markup=photoMarkup(ranStr))
         except Exception as e:
             logger.info(e)
     
-    photoK.queueToDelete(message, photoM)
+    photoK.queueToDelete(message, photoM, ranStr)
     bot.delete_message(waitM.chat.id, waitM.message_id)
 
 
-def photoMarkup():
+def photoMarkup(ranStr:str):
     markup = InlineKeyboardMarkup()
     markup.row_width = 1
-    markup.add(InlineKeyboardButton("Keep this photo", callback_data="cb_keep_photo"))
+    markup.add(InlineKeyboardButton("Keep this photo", callback_data="cb_keep_photo"+ranStr))
     return markup
 
 
 
 class PhotoKeeper():
-    # if multiple photos are present this will mess up the callback
     def __init__(self):
         self.delay = 5  # 5
+        self.store = {}
+    # store the timer and message with a random string 
+    # to uniquely identify the callback source
 
     def tmpDelete(self,*messages):
         for i in messages:
             bot.delete_message(i.chat.id, i.message_id)
 
-    def queueToDelete(self, commandM, photoM):
-        self.photoM = photoM
-        self.timer = Timer(self.delay, self.tmpDelete,[commandM, photoM])
-        self.timer.start()
+    def queueToDelete(self, commandM, photoM, ranStr):
+        timer = Timer(self.delay, self.tmpDelete,[commandM, photoM])
+        self.store[ranStr] = {
+            'timer': timer,
+            'photoM':photoM
+        }
+        timer.start()
         
-    def keepPhoto(self):
-        self.timer.cancel()
-        bot.edit_message_caption("",self.photoM.chat.id, self.photoM.message_id,reply_markup=None)
+    def keepPhoto(self,ranStr):
+        self.store[ranStr]['timer'].cancel()
+        photoM = self.store[ranStr]['photoM']
+        bot.edit_message_caption("",photoM.chat.id, photoM.message_id,reply_markup=None)
 
 
 photoK = PhotoKeeper()
@@ -178,8 +187,9 @@ def mediaMarkup():
 @bot.callback_query_handler(func=lambda call: True)
 def callback_query(call):
 
-    if call.data == "cb_keep_photo":
-        photoK.keepPhoto()
+
+    if call.data[:13]=="cb_keep_photo":
+        photoK.keepPhoto(call.data[-10:])
         return
 
     deleteMessage(call.message)
@@ -192,12 +202,17 @@ def callback_query(call):
 
     if call.data == "cb_stop_recording":
         file, act = recorder.close()
+        size = os.path.getsize(file)/1e6
 
-        logger.info(f"Recording finished: {os.path.basename(file)} ({act:.2f} sec) ({os.path.getsize(file)/1e6:.2f} MB)")
-        files = splitFilesInChunks(file)
-        nTxt = "The file will be split due to Telegram restrictions." if len(files)>1 else ""
-        message = bot.send_message(user, 
-            "Recording saved successfully. Wait while the bot uploads the file. " + nTxt)
+        logger.info(f"Recording finished: {os.path.basename(file)} ({act:.2f} sec) ({size:.2f} MB)")
+        msg = bot.send_message(user, "Recording saved successfully. Wait while the bot uploads the file.")
+        # print(msg)
+        if size > 48.0: # Telegram file size restriction is 50 MB
+            bot.edit_message_text(msg.text+" Due Telegram restrictions the file will be split.",msg.chat.id, msg.message_id)
+            files = splitFilesInChunks(file)
+        else:
+            files = [file]
+
         try:
             for file in files:
                 with open(file, 'rb') as f:
@@ -210,7 +225,7 @@ def callback_query(call):
             f"Something went wrong while uploading the file file. You can find the file stored as {file}")
         
 
-        deleteMessage(message)
+        deleteMessage(msg)
 
 
     elif call.data == "cb_cancel_recording":

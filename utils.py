@@ -1,5 +1,5 @@
 import os
-import subprocess
+import subprocess, random, string
 from time import time
 from glob import glob
 from threading import Timer
@@ -17,6 +17,12 @@ class RepeatTimer(Timer):
             self.function(*self.args, **self.kwargs)
 
 
+
+
+def getRandomString():
+    return ''.join(random.choice(string.ascii_letters) for _ in range(10))
+
+
 def getFileName(name: str, ext: str) -> str:
     now = datetime.now()
     fileName = f"{name}_{now.strftime('%H_%M_%S')}.{ext}"
@@ -27,9 +33,7 @@ def getFileName(name: str, ext: str) -> str:
 
 
 def splitFilesInChunks(inFile, chunks=300):
-    # split in chunks of 10 minutes
-    if os.path.getsize(inFile)/1e6 <= 48.0: # telegram file size limit 50MB
-        return [inFile]
+    # split in chunks of 5 minutes
 
     if os.path.exists(TMP_DIR):
         for f in glob(f'{TMP_DIR}/*'): os.remove(f)
@@ -57,10 +61,10 @@ class AVRecorder:
         self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -video_size 1280x720 -rtbufsize 2G'.split()
         self.vidFlags    = "-vcodec libx265 -crf 28 -r 21".split()
         # get list of devices with `ffmpeg -list_devices true -f dshow -i dummy`
-        # self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
-        # self.videoInput  = "video=HP HD Camera"
-        self.videoInput  = "video=GENERAL WEBCAM"
-        self.audioInput  = "audio=Microphone (GENERAL WEBCAM)"
+        self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
+        self.videoInput  = "video=HP HD Camera"
+        # self.videoInput  = "video=GENERAL WEBCAM"
+        # self.audioInput  = "audio=Microphone (GENERAL WEBCAM)"
         self.isRunning   = False
 
 
