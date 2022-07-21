@@ -205,16 +205,18 @@ def callback_query(call):
         size = os.path.getsize(file)/1e6
 
         logger.info(f"Recording finished: {os.path.basename(file)} ({act:.2f} sec) ({size:.2f} MB)")
-        msg = bot.send_message(user, "Recording saved successfully. Wait while the bot uploads the file.")
-        # print(msg)
+        msg = bot.send_message(user, 
+            "Recording saved successfully. Wait while the bot uploads the file." + 
+            (" Due Telegram restrictions the file will be split." if size>48.0 else "")
+        )
         if size > 48.0: # Telegram file size restriction is 50 MB
-            bot.edit_message_text(msg.text+" Due Telegram restrictions the file will be split.",msg.chat.id, msg.message_id)
             files = splitFilesInChunks(file)
         else:
             files = [file]
 
         try:
             for file in files:
+                print('-----------------', os.path.getsize(file))
                 with open(file, 'rb') as f:
                     if file.endswith('mp4'):
                         bot.send_video(user, f)
