@@ -59,7 +59,7 @@ class AVRecorder:
 
     def __init__(self):
         self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -video_size 1280x720 -rtbufsize 2G'.split()
-        self.vidFlags    = "-vcodec libx265 -crf 28 -r 21".split()
+        self.vidFlags    = "-vcodec libx265 -crf 28 -r 17".split()
         # get list of devices with `ffmpeg -list_devices true -f dshow -i dummy`
         # self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
         # self.videoInput  = "video=HP HD Camera"

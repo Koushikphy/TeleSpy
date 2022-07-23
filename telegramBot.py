@@ -2,10 +2,18 @@ from utils import *
 from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging, shutil
+from mega import Mega 
+
+
+
+
+
 
 TOKEN = os.getenv('TOKEN')
 ALLOWED_USERS = [int(i) for i in os.getenv('ALLOWED_USERS').split()]  
 ADMIN = os.getenv('ADMIN')
+
+
 
 bot = TeleBot(TOKEN, parse_mode='HTML')
 
@@ -25,7 +33,7 @@ class Reminder:
 
     def nudge(self):
         message = bot.send_message(self.userid, "Recording in progress. Don't forget to finish")
-        deleteMessage(message,10) # delete this notification after 10 seconds
+        deleteMessage(message,60) # delete this notification after 10 seconds
 
     def cancel(self):
         self.timer.cancel()
@@ -73,7 +81,7 @@ def checkRequest(message):
 
 
 
-@bot.message_handler(commands='start')
+@bot.message_handler(commands=['start'])
 def send_welcome(message):
     if checkRequest(message):
         return
@@ -81,7 +89,7 @@ def send_welcome(message):
 
 
 
-@bot.message_handler(commands='photo')
+@bot.message_handler(commands=['photo'])
 def send_photo(message):
     user = message.from_user.id
     if checkRequest(message):
@@ -143,7 +151,7 @@ class PhotoKeeper():
 photoK = PhotoKeeper()
 
 
-@bot.message_handler(commands='audio')
+@bot.message_handler(commands=['audio'])
 def send_audio(message):
     # start audio recording
     user = message.from_user.id
@@ -159,7 +167,7 @@ def send_audio(message):
 
 
 
-@bot.message_handler(commands='video')
+@bot.message_handler(commands=['video'])
 def send_video(message):
     user = message.from_user.id
     if checkRequest(message):
@@ -196,7 +204,7 @@ def callback_query(call):
     remind.cancel()  # clear all reminder
     user = call.from_user.id
 
-    if not recorder.isRunning :
+    if not recorder.isRunning:
         bot.send_message(user, "No recording is currently in progress !!!")
         return
 
@@ -205,27 +213,28 @@ def callback_query(call):
         size = os.path.getsize(file)/1e6
 
         logger.info(f"Recording finished: {os.path.basename(file)} ({act:.2f} sec) ({size:.2f} MB)")
-        msg = bot.send_message(user, 
-            "Recording saved successfully. Wait while the bot uploads the file." + 
-            (" Due Telegram restrictions the file will be split." if size>48.0 else "")
-        )
-        if size > 48.0: # Telegram file size restriction is 50 MB
-            files = splitFilesInChunks(file)
-        else:
-            files = [file]
+        msg = bot.send_message(user, "Recording saved successfully. Wait while the bot uploads the file.")
 
-        try:
-            for file in files:
-                print('-----------------', os.path.getsize(file))
-                with open(file, 'rb') as f:
-                    if file.endswith('mp4'):
-                        bot.send_video(user, f)
-                    else:
-                        bot.send_audio(user, f)
+        uploaded = False
+
+        try: # telegram server won't accept file larger than 50 mb
+            if size>49:
+                raise Exception('File too large to upload')
+            with open(file,'rb') as ff:
+                if file.endswith('mp4'):
+                    bot.send_video(user, ff)
+                else:
+                    bot.send_audio(user, ff)
         except:
-            bot.send_message(user, 
-            f"Something went wrong while uploading the file file. You can find the file stored as {file}")
-        
+            mm = bot.send_message(user, f"Something went wrong while uploading the file to telegram server."
+                "The bot will upload the file to a remote server")
+            link = mClient.get_upload_link(mClient.upload(file, MEGA_FOLDER))
+            deleteMessage(mm)
+            bot.send_message(user,link)
+            uploaded = True
+        finally:
+            if not uploaded: # upload it anyway for future storage
+                mClient.upload(file, MEGA_FOLDER)
 
         deleteMessage(msg)
 
@@ -240,4 +249,7 @@ def callback_query(call):
 
 
 bot.send_message(ADMIN, "Starting bot")
+mega = Mega()
+user,pasw,MEGA_FOLDER = os.getenv('MEGA').split(',')
+mClient = mega.login(user,pasw)
 bot.infinity_polling()

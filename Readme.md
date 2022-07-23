@@ -13,12 +13,13 @@ Take Photo/Audio/Video from webcam by remotely controlling it using a Telegram b
     1. `/photo` - Take photo  
     2. `/audio` - Take audio  
     3. `/video` - Take video  
-
+1. A mega account is also needed to upload larger files and accordingly the mega account credentials need to be put in the .env file.
 
 **NOTE:**
 
 1. If different devices are used for video and audio recording, then there may be some sync issue.  
 1. Current codebase uses a polling method for the bot to communicate with the telegram server, for a production level solution a webhook should be used.
+1. A smaple `.env` file is also provided [env_sample](./.env_sample)
 
 <!-- cut video with ffmpeg -->
 <!-- ffmpeg -ss 00:01:00 -to 00:02:00  -i input.mp4 -c copy output.mp4 -->

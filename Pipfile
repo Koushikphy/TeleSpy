@@ -5,6 +5,7 @@ name = "pypi"
 
 [packages]
 pytelegrambotapi = "*"
+"mega.py" = "*"
 
 [dev-packages]
 
