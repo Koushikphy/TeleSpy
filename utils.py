@@ -1,6 +1,6 @@
 import os
 import subprocess, random, string
-from time import time
+from time import time, sleep
 from glob import glob
 from threading import Timer
 from datetime import datetime
@@ -71,19 +71,22 @@ class AVRecorder:
     def startVideoRec(self):
         self.fileName = getFileName('Video', 'mp4')
         self.startTime = time()
-        self.runCommand([*self.commonFlags, '-i', f"{self.videoInput}:{self.audioInput}", *self.vidFlags, self.fileName])
+        return self.runCommand([*self.commonFlags, '-i', f"{self.videoInput}:{self.audioInput}", *self.vidFlags, self.fileName])
 
 
     def startAudeoRec(self):
         self.fileName = getFileName('Audio', 'm4a')
         self.startTime = time()
-        self.runCommand([*self.commonFlags, '-i', self.audioInput, self.fileName])
+        return self.runCommand([*self.commonFlags, '-i', self.audioInput, self.fileName])
 
 
     def takePicture(self):
         # take 5 photo to focus the camera and use the last photo
         self.runCommand([*self.commonFlags, '-i', self.videoInput, '-frames:v', '5', f'{TMP_DIR}/pic%03d.jpg'])
-        self.release()
+        ret = self.release()
+        if ret:
+            self.isRunning = False
+            return None
         fileName = getFileName('Photo', 'jpg')
         os.rename(f'{TMP_DIR}/pic005.jpg',fileName)
         return fileName
@@ -99,6 +102,13 @@ class AVRecorder:
                 stdout=LOG_FILE,
                 stderr=LOG_FILE,
             )
+        sleep(1)
+        # wait and check if the command fails
+        # it should return None if it working
+        ifFailed = self.recorder.poll()
+        if ifFailed: self.isRunning = False
+        return ifFailed
+
 
     def close(self):
         self.recorder.stdin.write('q'.encode("GBK")) 
@@ -109,7 +119,8 @@ class AVRecorder:
 
     def release(self):
         self.recorder.communicate()
-        self.recorder.wait()
+        # self.recorder.wait()   # communicate explicitly calls the wait
         self.isRunning = False
         self.recorder.terminate()
         self.recorder.kill()
+        return self.recorder.returncode

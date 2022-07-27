@@ -101,6 +101,11 @@ def send_photo(message):
 
     waitM = bot.send_message(user, "Wait while the bot takes the photo")
     file = recorder.takePicture()
+    if not file:
+        bot.send_message(user, "Device is busy. Can't capture photo.")
+        bot.delete_message(waitM.chat.id, waitM.message_id)
+        return
+
 
     ranStr = getRandomString()
 
@@ -151,23 +156,26 @@ class PhotoKeeper():
 photoK = PhotoKeeper()
 
 
-@bot.message_handler(commands=['audio'])
-def send_audio(message):
-    # start audio recording
-    user = message.from_user.id
-    if checkRequest(message):
-        return
+# @bot.message_handler(commands=['audio'])
+# def send_audio(message):
+#     # start audio recording
+#     user = message.from_user.id
+#     if checkRequest(message):
+#         return
 
-    if recorder.isRunning:
-        bot.send_message(user, "Recording already in progress.")
-    else:
-        recorder.startAudeoRec()
-        bot.send_message(user, "Recording in progress.", reply_markup=mediaMarkup())
-        remind.remind(user)
+#     if recorder.isRunning:
+#         bot.send_message(user, "Recording already in progress.")
+#     else:
+#         ret = recorder.startAudeoRec()
+#         if ret:
+#             bot.send_message(user, "Device is busy. Can't record.")
+#         else:
+#             bot.send_message(user, "Recording in progress.", reply_markup=mediaMarkup())
+#             remind.remind(user)
 
 
 
-@bot.message_handler(commands=['video'])
+@bot.message_handler(commands=['video','audio'])
 def send_video(message):
     user = message.from_user.id
     if checkRequest(message):
@@ -176,10 +184,12 @@ def send_video(message):
     if recorder.isRunning:
         bot.send_message(user, "Recording already in progress.")
     else:
-        recorder.startVideoRec()
-        bot.send_message(user, "Recording in progress.", reply_markup=mediaMarkup())
-        remind.remind(user)
-
+        ret = recorder.startVideoRec() if message.text =='/video' else recorder.startAudeoRec()
+        if ret:
+            bot.send_message(user, "Device is busy. Can't record.")
+        else:
+            bot.send_message(user, "Recording in progress.", reply_markup=mediaMarkup())
+            remind.remind(user)
 
 
 def mediaMarkup():
