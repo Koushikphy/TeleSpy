@@ -25,7 +25,7 @@ def getRandomString():
 
 def getFileName(name: str, ext: str) -> str:
     now = datetime.now()
-    fileName = f"{name}_{now.strftime('%H_%M_%S')}.{ext}"
+    fileName = f"{name}_{now.strftime('%d%m%y_%H%M%S')}.{ext}"
     dirPath = os.path.join(ASSETS_DIR, f"{now.strftime('%d_%m_%Y')}")
     os.makedirs(dirPath, exist_ok=True)
     return os.path.join(dirPath, fileName)
