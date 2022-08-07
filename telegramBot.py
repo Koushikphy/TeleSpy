@@ -111,7 +111,7 @@ def send_photo(message):
 
     with open(file, 'rb') as f:
         try:
-            photoM = bot.send_photo(user, f, caption="This photo will be deleted after 5 seconds.", 
+            photoM = bot.send_photo(user, f, caption="This photo will be deleted after 10 seconds.", 
                 reply_markup=photoMarkup(ranStr))
         except Exception as e:
             logger.info(e)
@@ -130,7 +130,7 @@ def photoMarkup(ranStr:str):
 
 class PhotoKeeper():
     def __init__(self):
-        self.delay = 5  # 5
+        self.delay = 10  # 5
         self.store = {}
     # store the timer and message with a random string 
     # to uniquely identify the callback source
