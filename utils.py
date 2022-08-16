@@ -58,9 +58,11 @@ def splitFilesInChunks(inFile, chunks=300):
 class AVRecorder:
 
     def __init__(self):
+        # get list of devices with `ffmpeg -list_devices true -f dshow -i dummy`
+        # control the `video_size`, `vcodec`, `crf`, `-r`(FPS) to tweak the video quality/size
+
         self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -video_size 1280x720 -rtbufsize 2G'.split()
         self.vidFlags    = "-vcodec libx265 -crf 28 -r 17".split()
-        # get list of devices with `ffmpeg -list_devices true -f dshow -i dummy`
         # self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
         # self.videoInput  = "video=HP HD Camera"
         self.videoInput  = "video=GENERAL WEBCAM"
@@ -81,7 +83,8 @@ class AVRecorder:
 
 
     def takePicture(self):
-        # take 5 photo to focus the camera and use the last photo
+        # Often times the first photo that ffmpeg takes does not have proper focus and exposure.
+        # Thus, take 5 photo to focus the camera and use the last photo
         self.runCommand([*self.commonFlags, '-i', self.videoInput, '-frames:v', '5', f'{TMP_DIR}/pic%03d.jpg'])
         ret = self.release()
         if ret:
