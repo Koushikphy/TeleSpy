@@ -18,6 +18,16 @@ class RepeatTimer(Timer):
 
 
 
+def takeScreenShot(other=None):
+    if other:
+        rr = subprocess.run(['bash', 'capture.sh', other])
+        fl = 'screen_shot.png'
+    else:
+        fl = getFileName('screenshot', 'jpg')
+        rr = subprocess.run(f"DISPLAY=:1 scrot -z {fl}",shell=True)
+    if rr.returncode==0:
+        return fl
+
 
 def getRandomString():
     return ''.join(random.choice(string.ascii_letters) for _ in range(10))
@@ -58,45 +68,48 @@ def splitFilesInChunks(inFile, chunks=300):
 class AVRecorder:
 
     def __init__(self):
+        #self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -video_size 1280x720 -rtbufsize 2G'.split()
+        #self.commonFlags = 'ffmpeg -hide_banner -y -video_size 1280x720 -rtbufsize 2G'.split()
+        self.commonFlags = 'ffmpeg -hide_banner -y -rtbufsize 2G'.split()
+        self.vidFlags    = "-pix_fmt yuv420p -profile:v baseline -vcodec libx264 -crf 28 ".split()
         # get list of devices with `ffmpeg -list_devices true -f dshow -i dummy`
-        # control the `video_size`, `vcodec`, `crf`, `-r`(FPS) to tweak the video quality/size
-
-        self.commonFlags = 'ffmpeg -hide_banner -f dshow -y -video_size 1280x720 -rtbufsize 2G'.split()
-        self.vidFlags    = "-vcodec libx265 -crf 28 -r 17".split()
         # self.audioInput  = "audio=Headset (realme Buds Wireless 2 Neo Hands-Free AG Audio)"
         # self.videoInput  = "video=HP HD Camera"
-        self.videoInput  = "video=GENERAL WEBCAM"
-        self.audioInput  = "audio=Microphone (GENERAL WEBCAM)"
+        self.videoInput  = "-f video4linux2 -vcodec mjpeg -video_size 1280x720 -i /dev/video0".split()
+        self.audioInput  = "-f alsa -ac 1 -i hw:1 -filter:a volume=1.5".split()
         self.isRunning   = False
 
 
     def startVideoRec(self):
         self.fileName = getFileName('Video', 'mp4')
         self.startTime = time()
-        return self.runCommand([*self.commonFlags, '-i', f"{self.videoInput}:{self.audioInput}", *self.vidFlags, self.fileName])
+        #return self.runCommand([*self.commonFlags, '-i', f"{self.videoInput}:{self.audioInput}", *self.vidFlags, self.fileName])
+        return self.runCommand([*self.commonFlags, *self.videoInput, *self.audioInput, *self.vidFlags, self.fileName])
 
 
     def startAudeoRec(self):
         self.fileName = getFileName('Audio', 'm4a')
         self.startTime = time()
-        return self.runCommand([*self.commonFlags, '-i', self.audioInput, self.fileName])
+        return self.runCommand([*self.commonFlags, *self.audioInput, self.fileName])
 
 
     def takePicture(self):
-        # Often times the first photo that ffmpeg takes does not have proper focus and exposure.
-        # Thus, take 5 photo to focus the camera and use the last photo
-        self.runCommand([*self.commonFlags, '-i', self.videoInput, '-frames:v', '5', f'{TMP_DIR}/pic%03d.jpg'])
+        #print(self.isRunning)
+        # take 5 photo to focus the camera and use the last photo
+        #self.runCommand([*self.commonFlags, '-i', self.videoInput, '-frames:v', '10', f'{TMP_DIR}/pic%03d.jpg'])
+        self.runCommand([*self.commonFlags, *self.videoInput ,'-frames:v', '10', f'{TMP_DIR}/pic%03d.jpeg'])
         ret = self.release()
         if ret:
             self.isRunning = False
             return None
-        fileName = getFileName('Photo', 'jpg')
-        os.rename(f'{TMP_DIR}/pic005.jpg',fileName)
+        fileName = getFileName('Photo', 'jpeg')
+        os.rename(f'{TMP_DIR}/pic010.jpeg',fileName)
         return fileName
 
 
     def runCommand(self, command):
         if self.isRunning : return
+        # print(command)
         self.isRunning = True
         self.recorder = subprocess.Popen(
                 command,
@@ -110,6 +123,7 @@ class AVRecorder:
         # it should return None if it working
         ifFailed = self.recorder.poll()
         if ifFailed: self.isRunning = False
+        #print(ifFailed)
         return ifFailed
 
 
@@ -127,3 +141,10 @@ class AVRecorder:
         self.recorder.terminate()
         self.recorder.kill()
         return self.recorder.returncode
+
+
+
+
+if __name__ =="__main__":
+    recorder = AVRecorder()
+    recorder.takePicture()
