@@ -85,7 +85,10 @@ class AVRecorder:
         self.videoInput  = "-f video4linux2 -vcodec mjpeg -video_size 1280x720 -i /dev/video0".split()
         self.fragFlags = '-g 64 -movflags frag_keyframe+empty_moov'.split()  
         #^ fragmented video, so that ffmpeg can extract frame while the recording in progress keyframes after every 64 frames
-        self.audioInput  = "-f alsa -ac 1 -i hw:1 -filter:a volume=1.5".split()
+        hwNumber = subprocess.check_output("arecord -l | grep WEBCAM | awk '{printf $2}' | cut -c 1", shell=True).decode().strip()
+        # this number may change on reboot, the command may not be same for all systems
+        print(f'Arecord HW number {hwNumber} ------------------------')
+        self.audioInput  = f"-f alsa -ac 1 -i hw:{hwNumber} -filter:a volume=1.5".split()
         self.isRunning   = False
 
 
